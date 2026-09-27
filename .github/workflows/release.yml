@@ -1,0 +1,40 @@
+name: Release
+
+# Push a tag like v1.2.0 → builds <plugin-slug>.zip (folder named after the slug)
+# and attaches it to a GitHub Release. Installed sites pick it up via the built-in updater.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check version matches tag
+        run: |
+          SLUG="${GITHUB_REPOSITORY#*/}"
+          TAG="${GITHUB_REF_NAME#v}"
+          HDR=$(grep -m1 -E '^\s*\*\s*Version:' "$SLUG.php" | awk '{print $NF}')
+          echo "slug=$SLUG tag=$TAG header=$HDR"
+          [ "$TAG" = "$HDR" ] || { echo "::error::Tag v$TAG does not match plugin header Version $HDR"; exit 1; }
+          echo "SLUG=$SLUG" >> "$GITHUB_ENV"
+
+      - name: PHP lint
+        run: find . -name '*.php' -not -path './.git/*' -print0 | xargs -0 -n1 php -l
+
+      - name: Build zip
+        run: |
+          mkdir -p "build/$SLUG"
+          rsync -a --exclude-from=.distignore ./ "build/$SLUG/"
+          (cd build && zip -rq "$SLUG.zip" "$SLUG")
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/${{ env.SLUG }}.zip
+          generate_release_notes: true

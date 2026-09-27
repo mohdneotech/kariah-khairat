@@ -1,0 +1,12 @@
+.git
+.github
+.gitattributes
+.gitignore
+.distignore
+build
+docs
+tests
+node_modules
+*.zip
+README.md
+CHANGELOG.md

@@ -1,0 +1,7 @@
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+/.github export-ignore
+/.gitattributes export-ignore
+/.distignore export-ignore
+/docs export-ignore
