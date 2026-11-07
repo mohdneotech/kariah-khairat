@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.5.1 — 2026-11-07
+- Fix: on block themes (e.g. Twenty Twenty-Five) the Makluman Takziah front-page section sat off-centre and made the page scroll sideways (WordPress forces `margin: auto !important` on children of constrained layouts). Full-width margins now take precedence. Classic themes were not affected.
+
 ## 1.5.0 — 2026-11-07
 Ported from the Perepat Kariah 1.4.0–1.4.3 site builds.
 - **Gambar profil ahli**: members upload / replace / remove a profile photo on Portal Ahli → Profil (JPG/PNG/WEBP ≤ 10 MB, re-encoded to a 600×600 JPEG, EXIF/GPS stripped, served privately); AJK can manage it from the member screen

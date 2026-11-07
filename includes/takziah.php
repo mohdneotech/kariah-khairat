@@ -259,7 +259,7 @@ function pk_tz_front_html() {
 	ob_start(); ?>
 	<style>
 	.pk-tz { background: radial-gradient(ellipse at top, #2a2a2a, #0d0d0d 70%); color: #eee; padding: 3rem 0 3.25rem; box-sizing: border-box; }
-	.wp-site-blocks .pk-tz, .is-layout-constrained > .pk-tz { width: 100vw; max-width: 100vw; margin-left: calc(50% - 50vw); margin-right: calc(50% - 50vw); }
+	.wp-site-blocks .pk-tz, .is-layout-constrained > .pk-tz { width: 100vw; max-width: 100vw; margin-left: calc(50% - 50vw) !important; margin-right: calc(50% - 50vw) !important; }
 	.pk-tz *, .pk-tz *::before, .pk-tz *::after { box-sizing: border-box; }
 	.pk-tz-in { max-width: 1320px; margin: 0 auto; padding: 0 clamp(1rem, 3vw, 2rem); }
 	.pk-tz-head { text-align: center; margin-bottom: 1.5rem; }
