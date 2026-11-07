@@ -82,3 +82,16 @@
     if (btn) show(btn);
   }
 })();
+(function () {
+  // step buttons on the guest portal: open the matching tab and scroll to it
+  document.addEventListener('click', function (e) {
+    var el = e.target.closest('[data-pk-goto]');
+    if (!el || !window.bootstrap) return;
+    var btn = document.querySelector('.pk-tabs [data-bs-target="' + el.getAttribute('data-pk-goto') + '"]');
+    if (!btn) return;
+    e.preventDefault();
+    bootstrap.Tab.getOrCreateInstance(btn).show();
+    var tabs = document.getElementById('pk-guest-tabs');
+    if (tabs) tabs.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+})();

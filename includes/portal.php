@@ -43,7 +43,7 @@ add_action( 'template_redirect', function () {
 	$act = is_string( $_POST['pk_portal'] ) ? sanitize_key( $_POST['pk_portal'] ) : '';
 	$err = &$GLOBALS['pk_errors'];
 	if ( ! wp_verify_nonce( $_POST['pk_nonce'] ?? '', 'pk_portal_' . $act ) ) { $err[] = 'Sesi tamat. Sila muat semula halaman dan cuba lagi.'; return; }
-	$map = [ 'login' => 'pk_portal_login', 'aktif' => 'pk_portal_aktif', 'pautkan' => 'pk_portal_pautkan', 'profil' => 'pk_portal_profil', 'keluarga' => 'pk_portal_keluarga', 'bayar' => 'pk_portal_bayar', 'katalaluan' => 'pk_portal_katalaluan', 'batal' => 'pk_portal_batal' ];
+	$map = [ 'login' => 'pk_portal_login', 'aktif' => 'pk_portal_aktif', 'pautkan' => 'pk_portal_pautkan', 'profil' => 'pk_portal_profil', 'keluarga' => 'pk_portal_keluarga', 'bayar' => 'pk_portal_bayar', 'katalaluan' => 'pk_portal_katalaluan', 'batal' => 'pk_portal_batal', 'foto' => 'pk_portal_foto', 'foto_padam' => 'pk_portal_foto_padam' ];
 	if ( ! isset( $map[ $act ] ) ) { return; }
 	if ( 'pautkan' === $act && ! is_user_logged_in() ) { $err[] = 'Sila log masuk semula.'; return; }
 	if ( ! in_array( $act, [ 'login', 'aktif', 'pautkan' ], true ) && ! pk_ahli_for_user() ) { $err[] = 'Sila log masuk semula.'; return; }
@@ -79,7 +79,7 @@ function pk_portal_aktif() {
 	if ( $bad = pk_password_problem( $p1, $kp, $hp ) ) { return new WP_Error( 'x', $bad ); }
 	$a = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . pk_t( 'ahli' ) . " WHERE no_kp=%s AND status NOT IN ('ditolak','meninggal') ORDER BY id DESC LIMIT 1", $kp ), ARRAY_A );
 	if ( ! $a || ! pk_hp_match( $a['no_hp'], $hp ) ) {
-		return new WP_Error( 'x', 'Maklumat tidak sepadan dengan rekod ahli. Pastikan No. KP dan No. Telefon sama seperti semasa pendaftaran, atau hubungi AJK.' );
+		return new WP_Error( 'x', 'Tiada rekod ahli yang sepadan. Jika anda belum mendaftar, sila daftar dahulu (langkah 1). Jika sudah, pastikan No. KP dan No. Telefon sama seperti dalam borang pendaftaran, atau hubungi AJK.' );
 	}
 	if ( $a['user_id'] && get_userdata( $a['user_id'] ) ) { return new WP_Error( 'x', 'Akaun portal untuk ahli ini telah diaktifkan. Sila log masuk, atau hubungi AJK untuk set semula kata laluan.' ); }
 	if ( username_exists( $kp ) ) { return new WP_Error( 'x', 'Akaun dengan No. KP ini sudah wujud. Sila hubungi AJK.' ); }
@@ -131,6 +131,26 @@ function pk_portal_profil() {
 	if ( isset( $diff['email'] ) && $new['email'] && ! email_exists( $new['email'] ) ) { wp_update_user( [ 'ID' => get_current_user_id(), 'user_email' => $new['email'] ] ); }
 	pk_log( $a['id'], 'kemaskini_profil', $diff );
 	return [ 'Maklumat anda telah dikemas kini.', 'profil' ];
+}
+
+function pk_portal_foto() {
+	$a = pk_ahli_for_user();
+	if ( ! pk_throttle( 'foto_' . get_current_user_id(), 10, HOUR_IN_SECONDS ) ) { return new WP_Error( 'x', 'Terlalu banyak cubaan. Sila cuba lagi kemudian.' ); }
+	$rel = pk_store_foto( 'foto' );
+	if ( null === $rel ) { return new WP_Error( 'x', 'Sila pilih gambar untuk dimuat naik.' ); }
+	if ( is_wp_error( $rel ) ) { return $rel; }
+	pk_ahli_set_foto( $a['id'], $rel );
+	pk_log( $a['id'], 'foto_kemaskini', 'Gambar profil dimuat naik oleh ahli' );
+	return [ 'Gambar profil anda telah dikemas kini.', 'profil' ];
+}
+
+function pk_portal_foto_padam() {
+	$a = pk_ahli_for_user();
+	if ( $a['gambar'] ) {
+		pk_ahli_set_foto( $a['id'], '' );
+		pk_log( $a['id'], 'foto_padam', 'Gambar profil dibuang oleh ahli' );
+	}
+	return [ 'Gambar profil telah dibuang.', 'profil' ];
 }
 
 function pk_portal_keluarga() {
@@ -214,12 +234,48 @@ add_shortcode( 'pk_portal', function () {
 function pk_portal_guest() {
 	$tab = ( $_POST['pk_portal'] ?? '' ) === 'aktif' ? 'aktif' : 'login';
 	$staff_login = wp_login_url( pk_page_url( 'portal' ) );
+	$daftar      = pk_page_url( 'khairat' );
 	ob_start(); ?>
 	<div class="pk-portal-guest">
 		<div class="pk-intro"><div><i class="fa-solid fa-id-card"></i></div><div><strong>Portal Ahli Kariah</strong><br>Semak maklumat keahlian khairat, tanggungan, yuran dan resit bayaran anda. Kemas kini maklumat hubungan pada bila-bila masa.</div></div>
-		<ul class="nav nav-pills pk-tabs justify-content-center mb-3" role="tablist">
-			<li class="nav-item"><button class="nav-link <?php echo 'login' === $tab ? 'active' : ''; ?>" data-bs-toggle="pill" data-bs-target="#pk-login" type="button"><i class="fa-solid fa-right-to-bracket"></i> Log Masuk</button></li>
-			<li class="nav-item"><button class="nav-link <?php echo 'aktif' === $tab ? 'active' : ''; ?>" data-bs-toggle="pill" data-bs-target="#pk-aktif" type="button"><i class="fa-solid fa-user-check"></i> Aktifkan Akaun (kali pertama)</button></li>
+
+		<div class="pk-guest-grid">
+		<div class="pk-guest-steps">
+		<h2 class="pk-steps-title">Cara mula menggunakan portal</h2>
+		<ol class="pk-gsteps">
+			<li class="pk-gstep pk-gstep-first">
+				<span class="pk-gstep-no">1</span>
+				<div class="pk-gstep-body">
+					<strong>Daftar sebagai ahli</strong>
+					<span>Isi borang pendaftaran dalam talian. <b>Wajib</b> sebelum akaun boleh diaktifkan. Sekali sahaja.</span>
+					<a class="btn btn-mp btn-sm mt-2" href="<?php echo esc_url( $daftar ); ?>"><i class="fa-solid fa-pen-to-square"></i> Daftar Sekarang</a>
+					<small class="pk-gstep-note">Sudah mendaftar dengan borang kertas di masjid? Terus ke langkah 2.</small>
+				</div>
+			</li>
+			<li class="pk-gstep">
+				<span class="pk-gstep-no">2</span>
+				<div class="pk-gstep-body">
+					<strong>Aktifkan akaun</strong>
+					<span>Selepas mendaftar, cipta kata laluan menggunakan No. KP &amp; No. Telefon yang <b>sama seperti dalam borang</b>.</span>
+					<button type="button" class="btn btn-outline-mp btn-sm mt-2" data-pk-goto="#pk-aktif"><i class="fa-solid fa-user-check"></i> Aktifkan Akaun</button>
+				</div>
+			</li>
+			<li class="pk-gstep">
+				<span class="pk-gstep-no">3</span>
+				<div class="pk-gstep-body">
+					<strong>Log masuk</strong>
+					<span>Seterusnya, log masuk dengan No. KP dan kata laluan anda.</span>
+					<button type="button" class="btn btn-outline-mp btn-sm mt-2" data-pk-goto="#pk-login"><i class="fa-solid fa-right-to-bracket"></i> Log Masuk</button>
+				</div>
+			</li>
+		</ol>
+
+		</div>
+		<div class="pk-guest-forms">
+		<ul class="nav nav-pills pk-tabs justify-content-center mb-3" role="tablist" id="pk-guest-tabs">
+			<li class="nav-item"><a class="nav-link pk-tab-daftar" href="<?php echo esc_url( $daftar ); ?>"><span class="pk-tab-no">1</span> Daftar</a></li>
+			<li class="nav-item"><button class="nav-link <?php echo 'aktif' === $tab ? 'active' : ''; ?>" data-bs-toggle="pill" data-bs-target="#pk-aktif" type="button"><span class="pk-tab-no">2</span> Aktifkan Akaun</button></li>
+			<li class="nav-item"><button class="nav-link <?php echo 'login' === $tab ? 'active' : ''; ?>" data-bs-toggle="pill" data-bs-target="#pk-login" type="button"><span class="pk-tab-no">3</span> Log Masuk</button></li>
 		</ul>
 		<div class="tab-content">
 			<div class="tab-pane fade <?php echo 'login' === $tab ? 'show active' : ''; ?>" id="pk-login">
@@ -229,14 +285,16 @@ function pk_portal_guest() {
 					<div class="mb-3"><label class="form-label">Kata laluan</label><input class="form-control" type="password" name="pass" required autocomplete="current-password"></div>
 					<label class="form-check mb-3"><input class="form-check-input" type="checkbox" name="ingat" value="1"> <span class="form-check-label">Ingat saya</span></label>
 					<button class="btn btn-mp w-100"><i class="fa-solid fa-right-to-bracket"></i> Log Masuk</button>
-					<p class="small text-secondary mt-3 mb-0">Terlupa kata laluan? Sila hubungi AJK / pejabat masjid untuk set semula.</p>
+					<p class="small text-secondary mt-3 mb-0">Kali pertama? <a href="<?php echo esc_url( $daftar ); ?>">Daftar</a> dahulu, kemudian <a href="#pk-aktif" data-pk-goto="#pk-aktif">aktifkan akaun</a>.</p>
+					<p class="small text-secondary mt-2 mb-0">Terlupa kata laluan? Sila hubungi AJK / pejabat masjid untuk set semula.</p>
 					<p class="small text-secondary mt-2 mb-0"><i class="fa-solid fa-user-shield"></i> AJK / pentadbir: <a href="<?php echo esc_url( $staff_login ); ?>">log masuk melalui halaman pentadbir</a> untuk mengurus rekod ahli anda sendiri.</p>
 				</form>
 			</div>
 			<div class="tab-pane fade <?php echo 'aktif' === $tab ? 'show active' : ''; ?>" id="pk-aktif">
 				<form method="post" class="pk-card pk-form">
 					<?php echo pk_pf( 'aktif' ); ?>
-					<p class="small text-secondary">Untuk ahli yang telah berdaftar dengan Badan Khairat Kematian. Masukkan No. KP dan No. Telefon <strong>seperti dalam rekod pendaftaran</strong>, kemudian cipta kata laluan.</p>
+					<div class="pk-need-daftar"><i class="fa-solid fa-circle-exclamation"></i><div><strong>Belum mendaftar?</strong> Akaun hanya boleh diaktifkan selepas anda mendaftar sebagai ahli. <a href="<?php echo esc_url( $daftar ); ?>">Daftar dahulu (langkah 1) &rarr;</a></div></div>
+					<p class="small text-secondary">Sudah mendaftar? Masukkan No. KP dan No. Telefon <strong>seperti dalam borang pendaftaran</strong>, kemudian cipta kata laluan.</p>
 					<div class="row g-3">
 						<div class="col-md-6"><label class="form-label">No. Kad Pengenalan *</label><input class="form-control" name="kp" required inputmode="numeric" value="<?php echo 'aktif' === $tab ? esc_attr( pk_p( 'kp' ) ) : ''; ?>"></div>
 						<div class="col-md-6"><label class="form-label">No. Telefon berdaftar *</label><input class="form-control" name="hp" type="tel" required value="<?php echo 'aktif' === $tab ? esc_attr( pk_p( 'hp' ) ) : ''; ?>"></div>
@@ -245,9 +303,11 @@ function pk_portal_guest() {
 						<div class="col-12"><label class="form-label">E-mel <small class="text-secondary">(pilihan)</small></label><input class="form-control" type="email" name="email" value="<?php echo 'aktif' === $tab ? esc_attr( pk_p( 'email' ) ) : ''; ?>"></div>
 					</div>
 					<button class="btn btn-mp mt-3"><i class="fa-solid fa-user-check"></i> Aktifkan Akaun</button>
-					<p class="small text-secondary mt-3 mb-0">Belum berdaftar sebagai ahli? <a href="<?php echo esc_url( pk_page_url( 'khairat' ) ); ?>">Daftar Khairat Kematian</a>.</p>
+
 				</form>
 			</div>
+		</div>
+		</div>
 		</div>
 	</div>
 	<?php
@@ -267,7 +327,7 @@ function pk_portal_member( array $a ) {
 	ob_start(); ?>
 	<div class="pk-portal" id="pk-top">
 		<div class="pk-member-head">
-			<div class="pk-avatar"><?php echo esc_html( mb_substr( $a['nama'], 0, 1 ) ); ?></div>
+			<?php echo pk_avatar_html( $a ); ?>
 			<div class="flex-grow-1">
 				<div class="pk-mh-name"><?php echo esc_html( $a['nama'] ); ?></div>
 				<div class="pk-mh-meta">No. Ahli <strong><?php echo esc_html( $a['no_ahli'] ?: 'belum diberikan' ); ?></strong> · <?php echo pk_badge( 'status_ahli', $a['status'] ); ?> · Yuran <?php echo (int) $yr; ?>: <?php echo $paid ? '<span class="pk-badge pk-b-ok">Dijelaskan</span>' : '<span class="pk-badge pk-b-warn">Belum dijelaskan</span>'; ?></div>
@@ -287,6 +347,19 @@ function pk_portal_member( array $a ) {
 		<div class="tab-content pk-tab-body">
 			<!-- PROFIL -->
 			<div class="tab-pane fade show active" id="profil">
+				<div class="pk-card pk-foto-card">
+					<?php echo pk_avatar_html( $a, 'pk-avatar pk-avatar-lg' ); ?>
+					<div class="flex-grow-1">
+						<h3 class="pk-h mb-1"><i class="fa-solid fa-camera text-mp"></i> Gambar Profil</h3>
+						<p class="small text-secondary mb-2">JPG, PNG atau WEBP, maksimum 10 MB. Gambar akan dipotong segi empat sama. Hanya anda dan AJK boleh melihat gambar ini.</p>
+						<form method="post" enctype="multipart/form-data" class="d-flex flex-wrap gap-2 align-items-center">
+							<?php echo pk_pf( 'foto' ); ?>
+							<input class="form-control form-control-sm" style="max-width:320px" type="file" name="foto" accept="image/jpeg,image/png,image/webp" required>
+							<button class="btn btn-sm btn-mp"><i class="fa-solid fa-upload"></i> <?php echo $a['gambar'] ? 'Tukar gambar' : 'Muat naik'; ?></button>
+						</form>
+						<?php if ( $a['gambar'] ) : ?><form method="post" class="mt-2" onsubmit="return confirm('Buang gambar profil anda?')"><?php echo pk_pf( 'foto_padam' ); ?><button class="btn btn-link btn-sm text-danger p-0">Buang gambar</button></form><?php endif; ?>
+					</div>
+				</div>
 				<form method="post" class="pk-card pk-form">
 					<?php echo pk_pf( 'profil' ); ?>
 					<div class="pk-kv mb-3"><div><span>Nama</span><?php echo esc_html( $a['nama'] ); ?></div><div><span>No. KP</span><?php echo esc_html( pk_fmt_kp( $a['no_kp'] ) ); ?></div><div><span>Tarikh daftar</span><?php echo esc_html( pk_date( $a['tarikh_daftar'] ) ); ?></div></div>

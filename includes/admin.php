@@ -18,6 +18,7 @@ add_action( 'admin_menu', function () {
 	add_submenu_page( 'pk-dashboard', 'Daftar Korban (Manual)', '+ Daftar Korban', PK_CAP, 'pk-korban-baru', 'pk_page_korban_baru' );
 	add_submenu_page( 'pk-dashboard', 'Bayaran & Ansuran', 'Bayaran & Ansuran', PK_CAP, 'pk-bayaran', 'pk_page_bayaran' );
 	add_submenu_page( 'pk-dashboard', 'Permohonan Kemas Kini', 'Kemas Kini Ahli' . ( $km ? ' <span class="awaiting-mod">' . $km . '</span>' : '' ), PK_CAP, 'pk-kemaskini', 'pk_page_kemaskini' );
+	add_submenu_page( 'pk-dashboard', 'Makluman Takziah', 'Takziah', PK_CAP, 'pk-takziah', 'pk_page_takziah' );
 	add_submenu_page( 'pk-dashboard', 'Import / Eksport', 'Import / Eksport', PK_CAP, 'pk-import', 'pk_page_import' );
 	add_submenu_page( 'pk-dashboard', 'Tetapan', 'Tetapan', 'manage_options', 'pk-tetapan', 'pk_page_tetapan' );
 } );
@@ -331,6 +332,14 @@ function pk_page_tetapan() {
 			$row( 'ID lampiran borang PDF', $in( 'fail_borang' ), 'ID Media (dipisahkan koma) untuk shortcode <code>[pk_muat_turun]</code>. ID boleh dilihat pada URL semasa membuka fail di Media.' );
 		?></table>
 
+		<h2>Makluman takziah</h2>
+		<table class="form-table" role="presentation"><?php
+			$row( 'Teks doa pada poster', $ta( 'takziah_doa', 4 ), 'Satu baris setiap baris (maks. 6).' );
+			$row( 'Kaki imej (sumber)', $in( 'takziah_kaki', 'class="large-text"' ), 'Dicetak di bahagian bawah poster.' );
+			$row( 'Laman utama', '<label><input type="checkbox" name="s[takziah_utama]" value="1" ' . checked( $s['takziah_utama'], 1, false ) . '> Papar makluman aktif secara automatik di atas kandungan laman utama</label>', 'Atau letak shortcode <code>[pk_takziah]</code> di mana-mana halaman.' );
+			$row( 'Tempoh paparan', '<label>Papar di laman utama selama ' . $in( 'takziah_hari', 'min="1" max="60" class="small-text"', 'number' ) . ' hari (lalai)</label>', 'Perubahan berkuat kuasa pada poster yang dijana selepas ini. Buka makluman sedia ada dan tekan Simpan untuk menjana semula.' );
+		?></table>
+
 		<h2>Halaman</h2>
 		<table class="form-table" role="presentation"><?php
 			foreach ( pk_page_map() as $k => [ $sc, $title ] ) {
@@ -367,14 +376,16 @@ add_action( 'admin_post_pk_tetapan', function () {
 	$str = fn( $k, $max = 190 ) => mb_substr( sanitize_text_field( is_scalar( $in[ $k ] ?? '' ) ? (string) ( $in[ $k ] ?? '' ) : '' ), 0, $max );
 	foreach ( $def as $k => $v ) {
 		switch ( true ) {
-			case in_array( $k, [ 'buka_khairat', 'buka_korban', 'padam_data' ], true ):
+			case in_array( $k, [ 'buka_khairat', 'buka_korban', 'padam_data', 'takziah_utama' ], true ):
 				$out[ $k ] = empty( $in[ $k ] ) ? 0 : 1; break;
 			case 'fail_borang' === $k:
 				$out[ $k ] = array_values( array_filter( array_map( 'intval', explode( ',', (string) ( $in[ $k ] ?? '' ) ) ) ) ); break;
-			case in_array( $k, [ 'kawasan', 'nota_khairat', 'nota_korban', 'terma_khairat', 'teks_wakalah', 'alamat_masjid' ], true ):
+			case in_array( $k, [ 'kawasan', 'hubungi', 'nota_khairat', 'nota_korban', 'terma_khairat', 'teks_wakalah', 'alamat_masjid', 'takziah_doa' ], true ):
 				$out[ $k ] = mb_substr( sanitize_textarea_field( (string) ( $in[ $k ] ?? '' ) ), 0, 5000 ); break;
 			case in_array( $k, [ 'yuran_daftar', 'yuran_tahunan', 'harga_bahagian' ], true ):
 				$out[ $k ] = pk_money( $in[ $k ] ?? $v ); break;
+			case 'takziah_hari' === $k:
+				$out[ $k ] = max( 1, min( 60, (int) ( $in[ $k ] ?? 7 ) ) ); break;
 			case 'max_ansuran' === $k:
 				$out[ $k ] = max( 2, min( 36, (int) ( $in[ $k ] ?? 12 ) ) ); break;
 			case 'qr_url' === $k:

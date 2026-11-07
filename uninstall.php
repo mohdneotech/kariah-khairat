@@ -16,7 +16,7 @@ if ( empty( $s['padam_data'] ) ) {
 	return; // keep everything — reinstalling the plugin picks up where it left off
 }
 
-foreach ( [ 'ahli', 'tanggungan', 'korban', 'korban_peserta', 'pelan', 'bayaran', 'kemaskini', 'log' ] as $t ) {
+foreach ( [ 'ahli', 'tanggungan', 'korban', 'korban_peserta', 'pelan', 'bayaran', 'kemaskini', 'log', 'takziah' ] as $t ) {
 	$wpdb->query( 'DROP TABLE IF EXISTS ' . $wpdb->prefix . 'pk_' . $t ); // phpcs:ignore WordPress.DB.PreparedSQL
 }
 foreach ( [ 'pk_settings', 'pk_pages', 'pk_db_ver' ] as $o ) {
@@ -46,4 +46,11 @@ if ( is_dir( $dir ) ) {
 		$f->isDir() ? @rmdir( $f->getPathname() ) : @unlink( $f->getPathname() );
 	}
 	@rmdir( $dir );
+}
+
+// Public takziah posters (uploads/takziah)
+$tzdir = trailingslashit( wp_upload_dir()['basedir'] ) . 'takziah';
+if ( is_dir( $tzdir ) ) {
+	foreach ( glob( $tzdir . '/*' ) ?: [] as $f ) { if ( is_file( $f ) ) { @unlink( $f ); } }
+	@rmdir( $tzdir );
 }

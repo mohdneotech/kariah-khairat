@@ -45,6 +45,10 @@ function pk_default_settings() {
 		'fontawesome'      => 'auto',   // auto | cdn | off
 		'ip_sumber'        => 'remote', // remote | cloudflare | xff
 		'padam_data'       => 0,        // delete tables & files when the plugin is deleted
+		'takziah_doa'      => "Semoga rohnya dicucuri rahmat\ndan ditempatkan dalam kalangan\norang-orang yang beriman\ndan beramal soleh",
+		'takziah_kaki'     => 'Imej ini dijana oleh laman web rasmi ' . ( get_bloginfo( 'name' ) ?: 'masjid' ) . ' · ' . wp_parse_url( home_url(), PHP_URL_HOST ),
+		'takziah_hari'     => 7,
+		'takziah_utama'    => 1,        // show active notices at the top of the front page content
 	];
 }
 

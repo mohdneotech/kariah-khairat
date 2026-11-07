@@ -248,6 +248,7 @@ function pk_ahli_edit_screen( $id ) {
 				. '<p><a class="button button-primary" href="' . esc_url( admin_url( 'admin.php?page=pk-kemaskini' ) ) . '">Semak &amp; luluskan</a></p></div>';
 		}
 		pk_admin_pelan_panel( 'khairat', $id, [ 'tajuk' => "Yuran Tahunan $yr", 'jumlah' => pk_opt( 'yuran_tahunan' ), 'kategori' => 'tahunan', 'liputan' => (string) $yr ] );
+		pk_admin_foto_box( $a );
 		pk_admin_portal_box( $a );
 		pk_admin_log_box( $id );
 		?>

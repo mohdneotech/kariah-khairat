@@ -34,6 +34,17 @@ Plugin WordPress untuk mengurus **ahli kariah, Badan Khairat Kematian dan Ibadah
 |---|---|
 | ![](docs/papan-pemuka.png) | ![](docs/portal-ahli.png) |
 
+**Baharu dalam 1.5.0**
+- **Makluman Takziah** — AJK isi nama, tarikh dan gambar (atau guna gambar profil ahli); plugin menjana **poster takziah 1500×2250** (gambar hitam putih dalam bingkai, doa, kaki imej) dan memaparkannya di laman utama dengan butang *Muat turun* dan *Kongsi WhatsApp* sehingga tarikh yang ditetapkan. Shortcode `[pk_takziah]`.
+- **Gambar profil ahli** — ahli muat naik di Portal Ahli (dimampatkan, EXIF/GPS dibuang, disimpan secara peribadi); AJK boleh urus dari rekod ahli.
+- **Portal Ahli untuk pelawat** — langkah bernombor *1 Daftar → 2 Aktifkan akaun → 3 Log masuk*.
+
+| Poster takziah | Di laman utama | Portal Ahli (pelawat) |
+|---|---|---|
+| ![](docs/takziah-poster.jpg) | ![](docs/takziah-laman-utama.png) | ![](docs/portal-tetamu.png) |
+
+![Makluman takziah di wp-admin](docs/takziah-admin.png)
+
 ## Pemasangan
 
 1. Muat turun **`kariah-khairat.zip`** dari halaman [Releases](../../releases/latest).
@@ -55,6 +66,7 @@ Kemas kini seterusnya akan muncul di **Dashboard → Updates** seperti plugin bi
 | `[pk_semak]` | Semak status & hantar bukti ansuran |
 | `[pk_portal]` | Portal Ahli (log masuk / aktifkan akaun) |
 | `[pk_muat_turun ids="12,13"]` | Senarai borang PDF untuk dimuat turun |
+| `[pk_takziah]` | Makluman takziah aktif (poster) — atau papar automatik di atas laman utama (Tetapan) |
 
 ## Penting: nginx
 
@@ -78,7 +90,7 @@ Plugin akan memaparkan amaran merah di Tetapan dan Papan Pemuka jika folder ini 
 
 ## Keperluan
 
-WordPress 6.4+ · PHP 8.0+ · MySQL/MariaDB
+WordPress 6.4+ · PHP 8.0+ (sambungan **GD dengan FreeType** untuk poster takziah) · MySQL/MariaDB
 
 Disyorkan: plugin keselamatan dengan pengesahan dua langkah (2FA) untuk akaun AJK — sistem ini menyimpan No. KP dan alamat ahli (PDPA).
 
@@ -92,4 +104,4 @@ Data dan tetapan dikongsi (`wp_pk_*`, `pk_settings`). Nyahaktifkan plugin lama, 
 
 ## Lesen
 
-GPL-2.0-or-later © Mohd Nordin Hussain · Chart.js (MIT) dibundel dalam `assets/vendor/`.
+GPL-2.0-or-later © Mohd Nordin Hussain · Chart.js (MIT) dibundel dalam `assets/vendor/` · Fon poster (Noto Serif, Open Sans, Kaushan Script — SIL OFL) dalam `assets/takziah/fonts/`.

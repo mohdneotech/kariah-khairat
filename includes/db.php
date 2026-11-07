@@ -49,6 +49,7 @@ function pk_install_schema() {
   updated_at datetime NOT NULL,
   created_by bigint(20) unsigned NOT NULL DEFAULT 0,
   user_id bigint(20) unsigned NOT NULL DEFAULT 0,
+  gambar varchar(255) NOT NULL DEFAULT '',
   PRIMARY KEY  (id),
   KEY no_kp (no_kp),
   KEY status (status),
@@ -167,6 +168,25 @@ function pk_install_schema() {
   KEY ahli_id (ahli_id)
 ) $c;" );
 
+	$tz = pk_t( 'takziah' );
+	dbDelta( "CREATE TABLE $tz (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  ahli_id bigint(20) unsigned NOT NULL DEFAULT 0,
+  nama varchar(190) NOT NULL,
+  tarikh_lahir date NULL,
+  tarikh_meninggal date NOT NULL,
+  info text NULL,
+  gambar varchar(255) NOT NULL DEFAULT '',
+  imej varchar(255) NOT NULL DEFAULT '',
+  papar_hingga date NULL,
+  status varchar(10) NOT NULL DEFAULT 'aktif',
+  created_at datetime NOT NULL,
+  updated_at datetime NOT NULL,
+  created_by bigint(20) unsigned NOT NULL DEFAULT 0,
+  PRIMARY KEY  (id),
+  KEY papar (status,papar_hingga)
+) $c;" );
+
 	add_role( 'pk_ajk', 'AJK Kariah', [ 'read' => true, 'upload_files' => true, PK_CAP => true ] );
 	add_role( 'pk_ahli', 'Ahli Kariah', [ 'read' => true ] );
 	update_option( 'pk_db_ver', PK_DB_VER, false );
@@ -248,6 +268,8 @@ function pk_find_ahli_by_kp( $kp ) {
 
 function pk_delete_ahli( $id ) {
 	global $wpdb;
+	if ( ( $a = pk_get_ahli( $id ) ) && $a['gambar'] ) { pk_private_delete( $a['gambar'] ); }
+	$wpdb->update( pk_t( 'takziah' ), [ 'ahli_id' => 0 ], [ 'ahli_id' => $id ] );
 	foreach ( pk_pelan_list( 'khairat', $id ) as $p ) { pk_delete_pelan( $p['id'] ); }
 	$wpdb->delete( pk_t( 'tanggungan' ), [ 'ahli_id' => $id ] );
 	$wpdb->delete( pk_t( 'kemaskini' ), [ 'ahli_id' => $id ] );

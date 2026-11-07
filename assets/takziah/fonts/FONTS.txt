@@ -1,0 +1,5 @@
+Fonts bundled for the takziah poster generator (all SIL Open Font License 1.1, see OFL.txt):
+- Noto Serif Bold (Google / Noto project), static instance subset to Latin
+- Open Sans SemiBold & Bold (The Open Sans Project Authors), static instances subset to Latin
+- Kaushan Script (Impallari Type)
+- Aref Ruqaa Bold (Abdullah Aref / Google Fonts) — used to pre-render ../arab.png
