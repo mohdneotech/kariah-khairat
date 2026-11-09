@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.2 — 2026-11-09
+- **WordPress Dashboard widgets** (wp-admin home, for users with `pk_urus`):
+  - *Ahli Kariah* — active members, people covered, new members this month / year, Portal Ahli usage, membership status bar, top areas, pending registrations and change requests
+  - *Khairat & Bayaran* — this year's fee completion ring, paid / unpaid / no-plan bar, verified collections (year + this month), outstanding balance, payments awaiting review, korban shares for the season
+  - Every figure links to the matching filtered list. Numbers cached for 5 minutes and refreshed after any change.
+
 ## 1.5.1 — 2026-11-07
 - Fix: on block themes (e.g. Twenty Twenty-Five) the Makluman Takziah front-page section sat off-centre and made the page scroll sideways (WordPress forces `margin: auto !important` on children of constrained layouts). Full-width margins now take precedence. Classic themes were not affected.
 

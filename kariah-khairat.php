@@ -3,7 +3,7 @@
  * Plugin Name:       Kariah & Khairat Masjid
  * Plugin URI:        https://github.com/mohdneotech/kariah-khairat
  * Description:       Sistem ahli kariah untuk masjid / surau — pendaftaran Badan Khairat Kematian dan Ibadah Korban/Aqiqah dalam talian atau manual oleh AJK, bayaran sekaligus & ansuran dengan bukti bayaran, Portal Ahli, semak status, import/eksport CSV papan pemuka infografik, gambar profil ahli dan makluman takziah (poster) di laman utama.
- * Version:           1.5.1
+ * Version:           1.5.2
  * Requires at least: 6.4
  * Requires PHP:      8.0
  * Author:            Mohd Nordin Hussain
@@ -26,7 +26,7 @@ if ( defined( 'PK_VER' ) ) {
 	return;
 }
 
-define( 'PK_VER', '1.5.1' );
+define( 'PK_VER', '1.5.2' );
 define( 'PK_DB_VER', '3' );
 define( 'PK_FILE', __FILE__ );
 define( 'PK_DIR', plugin_dir_path( __FILE__ ) );
@@ -42,6 +42,7 @@ require_once PK_DIR . 'includes/class-github-updater.php';
 require_once PK_DIR . 'includes/foto.php';
 require_once PK_DIR . 'includes/takziah-render.php';
 require_once PK_DIR . 'includes/takziah.php';
+require_once PK_DIR . 'includes/dash-widget.php';
 if ( is_admin() ) {
 	require_once PK_DIR . 'includes/admin.php';
 	require_once PK_DIR . 'includes/admin-ahli.php';

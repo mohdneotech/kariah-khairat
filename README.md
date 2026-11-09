@@ -16,6 +16,7 @@ Plugin WordPress untuk mengurus **ahli kariah, Badan Khairat Kematian dan Ibadah
 
 **Untuk AJK (wp-admin)**
 - Papan pemuka dengan infografik (pendaftaran, kutipan, umur, kawasan, sektor, isi rumah)
+- **Widget di Papan Pemuka WordPress** (1.5.2): *Ahli Kariah* (ahli aktif, jiwa dilindungi, ahli baharu, guna portal, status keahlian, kawasan teratas) dan *Khairat & Bayaran* (peratus yuran tahun semasa dijelaskan, kutipan, baki tertunggak, bayaran perlu disemak, bahagian korban) — setiap angka dipautkan ke senarai yang ditapis
 - Senarai ahli dengan tapisan, kelulusan pukal, borang A4 boleh cetak, jana yuran tahunan
 - Sahkan / tolak bayaran, muat naik resit rasmi, pelan ansuran per rekod
 - Senarai peserta korban (7 bahagian seekor) boleh cetak
