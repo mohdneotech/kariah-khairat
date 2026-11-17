@@ -4,7 +4,9 @@ Plugin WordPress untuk mengurus **Ahli Kariah (No. Kariah), Badan Khairat Kemati
 
 *A WordPress plugin for Malaysian mosques to run parish (kariah) registration with system-issued member numbers, death-benefit (khairat) membership for registered kariah members and qurban/aqiqah registration: online forms with payment-proof upload, instalment plans, AJK approval workflow, member self-service portal, CSV import/export and an infographic dashboard. UI is in Bahasa Melayu; IC-number (MyKad) aware.*
 
-![Borang pendaftaran khairat](docs/borang-khairat.png)
+| Langkah 1 — Daftar Ahli Kariah | Langkah 2 — Daftar Khairat (Ahli Kariah sahaja) |
+|---|---|
+| ![Borang Ahli Kariah](docs/borang-kariah.png) | ![Borang khairat](docs/borang-khairat.png) |
 
 ## Ciri-ciri
 
@@ -40,6 +42,14 @@ Plugin WordPress untuk mengurus **Ahli Kariah (No. Kariah), Badan Khairat Kemati
 - **Dokumen sokongan:** borang Ahli Kariah mewajibkan salinan Kad Pengenalan; surat pengesahan alamat (JPKK / penghulu / pengerusi taman) diwajibkan jika alamat IC berbeza. Disimpan secara peribadi; AJK boleh lihat / muat naik dari rekod ahli, ahli boleh kemas kini di Portal Ahli. Senarai ahli menandakan rekod *Tiada salinan IC*.
 - **Kad Ahli Kariah:** imej PNG dijana ketika diminta (tidak disimpan) untuk Ahli Kariah aktif — logo masjid, warna tema plugin, gambar profil, No. Kariah, No. KP bertopeng, tarikh ahli dan **kod pengesahan** (AJK semak kod pada rekod ahli). Butang *Kad Ahli* di Portal, halaman cetak saiz sebenar.
 - **Terma Ahli Kariah** boleh disunting di Tetapan (`{masjid}` `{yuran_kariah}` `{umur_min_kariah}`), **umur minimum** pendaftaran (lalai 18 — disemak dari No. KP) dan pautan pilihan ke **halaman syarat & faedah**.
+
+![Kad Ahli Kariah](docs/kad-ahli-kariah.png)
+
+| Dokumen sokongan pada borang | Portal Ahli — kad & dokumen | Rekod ahli (AJK) |
+|---|---|---|
+| ![](docs/borang-dokumen.png) | ![](docs/portal-ahli.png) | ![](docs/admin-kad-dokumen.png) |
+
+*Tangkapan skrin daripada laman ujian "Masjid Al-Hidayah" — nama, No. KP dan dokumen adalah contoh rekaan.*
 
 **Baharu dalam 1.6.0 — Ahli Kariah dahulu, kemudian Khairat**
 - Pendaftaran **Ahli Kariah** (sekali seumur hidup) kini langkah pertama. **No. Kariah** (`KK-0001`) diberikan **oleh sistem sahaja** — selepas AJK meluluskan pendaftaran **dan** yuran Ahli Kariah disahkan (atau yuran RM0 / dikecualikan). Tiada sesiapa boleh mengisi atau menukar No. Kariah secara manual.
