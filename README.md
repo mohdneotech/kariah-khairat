@@ -1,15 +1,15 @@
 # Kariah & Khairat Masjid
 
-Plugin WordPress untuk mengurus **ahli kariah, Badan Khairat Kematian dan Ibadah Korban/Aqiqah** masjid atau surau — pendaftaran dalam talian, rekod manual oleh AJK, bayaran sekaligus atau ansuran, Portal Ahli dan papan pemuka infografik.
+Plugin WordPress untuk mengurus **Ahli Kariah (No. Kariah), Badan Khairat Kematian dan Ibadah Korban/Aqiqah** masjid atau surau — pendaftaran dalam talian, rekod manual oleh AJK, bayaran sekaligus atau ansuran, Portal Ahli dan papan pemuka infografik.
 
-*A WordPress plugin for Malaysian mosques to run death-benefit (khairat) membership and qurban/aqiqah registration: online forms with payment-proof upload, instalment plans, AJK approval workflow, member self-service portal, CSV import/export and an infographic dashboard. UI is in Bahasa Melayu; IC-number (MyKad) aware.*
+*A WordPress plugin for Malaysian mosques to run parish (kariah) registration with system-issued member numbers, death-benefit (khairat) membership for registered kariah members and qurban/aqiqah registration: online forms with payment-proof upload, instalment plans, AJK approval workflow, member self-service portal, CSV import/export and an infographic dashboard. UI is in Bahasa Melayu; IC-number (MyKad) aware.*
 
 ![Borang pendaftaran khairat](docs/borang-khairat.png)
 
 ## Ciri-ciri
 
 **Untuk orang awam**
-- Borang **Daftar Khairat** (ahli baharu / pembaharuan / tunggakan) dan **Daftar Korban & Aqiqah** (peserta, bahagian, agihan daging, akad wakalah)
+- Borang **Daftar Ahli Kariah** (sekali sahaja, terima No. Kariah) dan **Daftar Khairat** untuk Ahli Kariah sahaja (ahli baharu / pembaharuan / tunggakan) dan **Daftar Korban & Aqiqah** (peserta, bahagian, agihan daging, akad wakalah)
 - Bayaran **sekaligus atau ansuran** (2–36 bulan), muat naik bukti bayaran (JPG/PNG/PDF), kod QR & akaun bank masjid
 - **Semak Status & Bayar Ansuran** dengan No. KP + No. Telefon
 - **Portal Ahli** — log masuk dengan No. KP; lihat yuran, resit rasmi, tanggungan; kemas kini maklumat hubungan terus, perubahan pasangan/tanggungan melalui kelulusan AJK
@@ -35,6 +35,26 @@ Plugin WordPress untuk mengurus **ahli kariah, Badan Khairat Kematian dan Ibadah
 |---|---|
 | ![](docs/papan-pemuka.png) | ![](docs/portal-ahli.png) |
 
+**Baharu dalam 1.6.0 — Ahli Kariah dahulu, kemudian Khairat**
+- Pendaftaran **Ahli Kariah** (sekali seumur hidup) kini langkah pertama. **No. Kariah** (`KK-0001`) diberikan **oleh sistem sahaja** — selepas AJK meluluskan pendaftaran **dan** yuran Ahli Kariah disahkan (atau yuran RM0 / dikecualikan). Tiada sesiapa boleh mengisi atau menukar No. Kariah secara manual.
+- **Khairat Kematian hanya untuk Ahli Kariah aktif** — borang khairat meminta No. Kariah + No. KP (atau guna rekod Portal Ahli).
+- Status baharu *Diluluskan — Menunggu Bayaran*; tetapan **Yuran Ahli Kariah** dan **had umur anak** tanggungan khairat (lalai 18 — anak lebih tua perlu daftar sendiri).
+- Papan pemuka & senarai memaparkan status Ahli Kariah dan status Khairat secara berasingan.
+
+```mermaid
+flowchart TD
+  A["1. Daftar Ahli Kariah<br/>(borang dalam talian / AJK)"] --> B{"2. AJK luluskan?"}
+  B -- Tolak --> X["Ditolak"]
+  B -- Lulus --> C{"Yuran Ahli Kariah<br/>disahkan?"}
+  C -- Belum --> W["Diluluskan — Menunggu Bayaran"]
+  W -- "bayaran disahkan" --> D
+  C -- "Ya / RM0 / dikecualikan" --> D["3. No. Kariah diberikan oleh sistem"]
+  D --> E["4. Daftar Khairat<br/>No. Kariah + No. KP"]
+  E --> F["5. Bayar yuran pendaftaran + tahunan"]
+  F --> G["6. AJK sahkan bayaran"]
+  G --> H["Ahli Khairat aktif<br/>pembaharuan setiap tahun"]
+```
+
 **Baharu dalam 1.5.0**
 - **Makluman Takziah** — AJK isi nama, tarikh dan gambar (atau guna gambar profil ahli); plugin menjana **poster takziah 1500×2250** (gambar hitam putih dalam bingkai, doa, kaki imej) dan memaparkannya di laman utama dengan butang *Muat turun* dan *Kongsi WhatsApp* sehingga tarikh yang ditetapkan. Shortcode `[pk_takziah]`.
 - **Gambar profil ahli** — ahli muat naik di Portal Ahli (dimampatkan, EXIF/GPS dibuang, disimpan secara peribadi); AJK boleh urus dari rekod ahli.
@@ -51,8 +71,8 @@ Plugin WordPress untuk mengurus **ahli kariah, Badan Khairat Kematian dan Ibadah
 1. Muat turun **`kariah-khairat.zip`** dari halaman [Releases](../../releases/latest).
 2. wp-admin → **Plugins → Add New → Upload Plugin** → pilih zip → **Install Now** → **Activate**.
 3. Ikut **Kariah & Khairat → Persediaan**:
-   - **Tetapan** — nama & alamat masjid, yuran, harga bahagian korban, akaun bank, imej QR, kawasan, terma & syarat, warna
-   - **Cipta halaman** — lima halaman dicipta automatik dengan shortcode yang betul
+   - **Tetapan** — nama & alamat masjid, yuran Ahli Kariah & khairat, had umur anak, harga bahagian korban, akaun bank, imej QR, kawasan, terma & syarat, warna
+   - **Cipta halaman** — enam halaman dicipta automatik dengan shortcode yang betul
    - Tambah halaman ke menu (Penampilan → Menu / Editor Tapak)
 4. Cipta akaun AJK dengan peranan **AJK Kariah**.
 
@@ -62,7 +82,8 @@ Kemas kini seterusnya akan muncul di **Dashboard → Updates** seperti plugin bi
 
 | Shortcode | Fungsi |
 |---|---|
-| `[pk_borang_khairat]` | Borang pendaftaran / pembaharuan khairat |
+| `[pk_borang_kariah]` | Borang pendaftaran Ahli Kariah (langkah 1) |
+| `[pk_borang_khairat]` | Borang pendaftaran / pembaharuan khairat — Ahli Kariah sahaja (langkah 2) |
 | `[pk_borang_korban]` | Borang korban & aqiqah |
 | `[pk_semak]` | Semak status & hantar bukti ansuran |
 | `[pk_portal]` | Portal Ahli (log masuk / aktifkan akaun) |

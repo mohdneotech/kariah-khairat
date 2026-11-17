@@ -37,7 +37,7 @@ function pk_page_persediaan() {
 	?>
 	<div class="pk-box">
 		<h2>1. Tetapan asas</h2>
-		<p>Isi nama masjid, alamat, yuran khairat, harga bahagian korban, akaun bank dan kod QR.</p>
+		<p>Isi nama masjid, alamat, yuran Ahli Kariah &amp; khairat, harga bahagian korban, akaun bank dan kod QR.</p>
 		<p><a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=pk-tetapan' ) ); ?>">Buka Tetapan</a>
 		<?php echo pk_opt( 'bank' ) ? ' <span class="pk-badge pk-b-ok">Akaun bank ditetapkan</span>' : ' <span class="pk-badge pk-b-warn">Akaun bank belum ditetapkan</span>'; ?></p>
 	</div>

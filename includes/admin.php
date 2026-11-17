@@ -6,13 +6,13 @@ defined( 'ABSPATH' ) || exit;
 add_action( 'admin_menu', function () {
 	global $wpdb;
 	$pending = (int) $wpdb->get_var( 'SELECT COUNT(*) FROM ' . pk_t( 'bayaran' ) . " WHERE status='menunggu'" )
-		+ (int) $wpdb->get_var( 'SELECT COUNT(*) FROM ' . pk_t( 'ahli' ) . " WHERE status='menunggu'" )
+		+ (int) $wpdb->get_var( 'SELECT COUNT(*) FROM ' . pk_t( 'ahli' ) . " WHERE status='menunggu' OR khairat='menunggu'" )
 		+ (int) $wpdb->get_var( 'SELECT COUNT(*) FROM ' . pk_t( 'korban' ) . " WHERE status='menunggu'" )
 		+ ( $km = (int) $wpdb->get_var( 'SELECT COUNT(*) FROM ' . pk_t( 'kemaskini' ) . " WHERE status='menunggu'" ) );
 	$bubble = $pending ? ' <span class="awaiting-mod">' . $pending . '</span>' : '';
 	add_menu_page( 'Kariah & Khairat', 'Kariah & Khairat' . $bubble, PK_CAP, 'pk-dashboard', 'pk_page_dashboard', 'dashicons-groups', 26 );
 	add_submenu_page( 'pk-dashboard', 'Papan Pemuka', 'Papan Pemuka', PK_CAP, 'pk-dashboard', 'pk_page_dashboard' );
-	add_submenu_page( 'pk-dashboard', 'Ahli Khairat', 'Ahli Khairat', PK_CAP, 'pk-ahli', 'pk_page_ahli' );
+	add_submenu_page( 'pk-dashboard', 'Ahli Kariah & Khairat', 'Ahli Kariah', PK_CAP, 'pk-ahli', 'pk_page_ahli' );
 	add_submenu_page( 'pk-dashboard', 'Daftar Ahli (Manual)', '+ Daftar Ahli', PK_CAP, 'pk-ahli-baru', 'pk_page_ahli_baru' );
 	add_submenu_page( 'pk-dashboard', 'Korban & Aqiqah', 'Korban & Aqiqah', PK_CAP, 'pk-korban', 'pk_page_korban' );
 	add_submenu_page( 'pk-dashboard', 'Daftar Korban (Manual)', '+ Daftar Korban', PK_CAP, 'pk-korban-baru', 'pk_page_korban_baru' );
@@ -229,11 +229,15 @@ add_action( 'admin_post_pk_bayaran_status', function () {
 		if ( $own && 'khairat' === $pp['jenis'] ) { pk_log( $pp['ref_id'], 'semak_sendiri', 'Pentadbir menukar status bayaran sendiri kepada ' . $st . ' (' . pk_rm( $b['jumlah'] ) . ')' ); }
 		$wpdb->update( pk_t( 'bayaran' ), [ 'status' => $st, 'direkod_oleh' => get_current_user_id() ], [ 'id' => $id ] );
 		pk_pelan_refresh( (int) $b['pelan_id'] );
-		// verifying the first payment of a pending khairat application activates it
+		// verifying a payment: kariah fee activates the Ahli Kariah (No. Kariah); first khairat payment activates Khairat
 		$p = pk_get_pelan( $b['pelan_id'] );
 		if ( 'sah' === $st && $p && 'khairat' === $p['jenis'] && pk_p( 'aktifkan', '1' ) ) {
 			$a = pk_get_ahli( $p['ref_id'] );
-			if ( $a && 'menunggu' === $a['status'] ) { pk_save_ahli_data( [ 'status' => 'aktif' ], (int) $a['id'] ); }
+			// kariah fee: handled in pk_pelan_refresh() — No. Kariah only once the AJK has also approved the registration
+			if ( $a && 'kariah' !== $p['kategori'] && 'menunggu' === $a['khairat'] && pk_is_kariah_aktif( $a ) ) {
+				pk_save_ahli_data( [ 'khairat' => 'aktif', 'tarikh_khairat' => pk_today() ], (int) $a['id'] );
+				pk_log( $a['id'], 'khairat_lulus', 'Khairat diaktifkan apabila bayaran disahkan' );
+			}
 		}
 		if ( 'sah' === $st && $p && 'korban' === $p['jenis'] ) {
 			$k = pk_get_korban( $p['ref_id'] );
@@ -313,7 +317,8 @@ function pk_page_tetapan() {
 
 		<h2>Yuran &amp; bayaran</h2>
 		<table class="form-table" role="presentation"><?php
-			$row( 'Yuran Khairat', '<span class="pk-inline"><label>Pendaftaran (RM)<br>' . $in( 'yuran_daftar', 'step="0.01" min="0"', 'number' ) . '</label><label>Tahunan (RM)<br>' . $in( 'yuran_tahunan', 'step="0.01" min="0"', 'number' ) . '</label><label>Prefix No. Ahli<br>' . $in( 'prefix_ahli', 'size="6" maxlength="10"' ) . '</label></span>', 'No. Ahli dijana sebagai <code>PREFIX-0001</code> apabila ahli diaktifkan.' );
+			$row( 'Ahli Kariah', '<span class="pk-inline"><label>Yuran pendaftaran ahli kariah (RM)<br>' . $in( 'yuran_kariah', 'step="0.01" min="0"', 'number' ) . '</label><label>Had umur anak tanggungan khairat<br>' . $in( 'had_umur_anak', 'min="0" max="30" class="small-text"', 'number' ) . '</label></span>', '0 = percuma (AJK luluskan secara manual). Jika lebih 0, borang Ahli Kariah memaparkan bayaran dan pengesahan bayaran meluluskan ahli. Had umur: anak pada/melebihi umur ini perlu daftar khairat sendiri (0 = tiada had).' );
+			$row( 'Yuran Khairat', '<span class="pk-inline"><label>Pendaftaran (RM)<br>' . $in( 'yuran_daftar', 'step="0.01" min="0"', 'number' ) . '</label><label>Tahunan (RM)<br>' . $in( 'yuran_tahunan', 'step="0.01" min="0"', 'number' ) . '</label><label>Prefix No. Kariah<br>' . $in( 'prefix_ahli', 'size="6" maxlength="10"' ) . '</label></span>', 'No. Kariah dijana sebagai <code>PREFIX-0001</code> apabila ahli diaktifkan.' );
 			$row( 'Korban / Aqiqah', '<span class="pk-inline"><label>Musim (Hijrah)<br>' . $in( 'musim_korban', 'size="8"' ) . '</label><label>Tahun Masihi<br>' . $in( 'tahun_korban_m', 'size="6"' ) . '</label><label>Harga sebahagian (RM)<br>' . $in( 'harga_bahagian', 'step="0.01" min="0"', 'number' ) . '</label></span>', 'Tukar musim setiap tahun selepas Aidiladha — rekod lama kekal di bawah musim masing-masing.' );
 			$row( 'Ansuran', '<label>Maksimum bilangan bulan pada borang awam ' . $in( 'max_ansuran', 'min="2" max="36" class="small-text"', 'number' ) . '</label>' );
 			$row( 'Akaun bank', $in( 'bank', 'class="large-text" placeholder="cth. Bank Islam — MASJID ANDA — 1234 5678 9012"' ) );
@@ -323,9 +328,9 @@ function pk_page_tetapan() {
 
 		<h2>Borang &amp; teks</h2>
 		<table class="form-table" role="presentation"><?php
-			$row( 'Borang dalam talian', '<label><input type="checkbox" name="s[buka_khairat]" value="1" ' . checked( $s['buka_khairat'], 1, false ) . '> Buka pendaftaran Khairat</label><br><label><input type="checkbox" name="s[buka_korban]" value="1" ' . checked( $s['buka_korban'], 1, false ) . '> Buka pendaftaran Korban/Aqiqah</label>' );
+			$row( 'Borang dalam talian', '<label><input type="checkbox" name="s[buka_kariah]" value="1" ' . checked( $s['buka_kariah'], 1, false ) . '> Buka pendaftaran Ahli Kariah</label><br><label><input type="checkbox" name="s[buka_khairat]" value="1" ' . checked( $s['buka_khairat'], 1, false ) . '> Buka pendaftaran Khairat (Ahli Kariah sahaja)</label><br><label><input type="checkbox" name="s[buka_korban]" value="1" ' . checked( $s['buka_korban'], 1, false ) . '> Buka pendaftaran Korban/Aqiqah</label>' );
 			$row( 'Senarai kawasan / taman', $ta( 'kawasan', 4 ), 'Satu setiap baris — dicadangkan pada borang dan digunakan dalam infografik.' );
-			$row( 'Terma & syarat khairat', $ta( 'terma_khairat', 7 ), 'Satu syarat setiap baris. Boleh guna <code>{masjid}</code> <code>{yuran_daftar}</code> <code>{yuran_tahunan}</code>.' );
+			$row( 'Terma & syarat khairat', $ta( 'terma_khairat', 7 ), 'Satu syarat setiap baris. Boleh guna <code>{masjid}</code> <code>{yuran_daftar}</code> <code>{yuran_tahunan}</code> <code>{had_umur_anak}</code>.' );
 			$row( 'Akad wakalah korban', $ta( 'teks_wakalah', 3 ), 'Boleh guna <code>{masjid}</code>.' );
 			$row( 'Nota khairat', $ta( 'nota_khairat', 2 ), 'Dipaparkan selepas pendaftaran berjaya.' );
 			$row( 'Nota korban', $ta( 'nota_korban', 2 ) );
@@ -361,7 +366,7 @@ function pk_page_tetapan() {
 
 		<p><button class="button button-primary">Simpan Tetapan</button></p>
 		<h2>Shortcode</h2>
-		<p><code>[pk_borang_khairat]</code> · <code>[pk_borang_korban]</code> · <code>[pk_semak]</code> · <code>[pk_portal]</code> · <code>[pk_muat_turun ids="12,13"]</code></p>
+		<p><code>[pk_borang_kariah]</code> · <code>[pk_borang_khairat]</code> · <code>[pk_borang_korban]</code> · <code>[pk_semak]</code> · <code>[pk_portal]</code> · <code>[pk_muat_turun ids="12,13"]</code></p>
 	</form></div>
 	<?php
 }
@@ -376,16 +381,18 @@ add_action( 'admin_post_pk_tetapan', function () {
 	$str = fn( $k, $max = 190 ) => mb_substr( sanitize_text_field( is_scalar( $in[ $k ] ?? '' ) ? (string) ( $in[ $k ] ?? '' ) : '' ), 0, $max );
 	foreach ( $def as $k => $v ) {
 		switch ( true ) {
-			case in_array( $k, [ 'buka_khairat', 'buka_korban', 'padam_data', 'takziah_utama' ], true ):
+			case in_array( $k, [ 'buka_kariah', 'buka_khairat', 'buka_korban', 'padam_data', 'takziah_utama' ], true ):
 				$out[ $k ] = empty( $in[ $k ] ) ? 0 : 1; break;
 			case 'fail_borang' === $k:
 				$out[ $k ] = array_values( array_filter( array_map( 'intval', explode( ',', (string) ( $in[ $k ] ?? '' ) ) ) ) ); break;
 			case in_array( $k, [ 'kawasan', 'hubungi', 'nota_khairat', 'nota_korban', 'terma_khairat', 'teks_wakalah', 'alamat_masjid', 'takziah_doa' ], true ):
 				$out[ $k ] = mb_substr( sanitize_textarea_field( (string) ( $in[ $k ] ?? '' ) ), 0, 5000 ); break;
-			case in_array( $k, [ 'yuran_daftar', 'yuran_tahunan', 'harga_bahagian' ], true ):
+			case in_array( $k, [ 'yuran_kariah', 'yuran_daftar', 'yuran_tahunan', 'harga_bahagian' ], true ):
 				$out[ $k ] = pk_money( $in[ $k ] ?? $v ); break;
 			case 'takziah_hari' === $k:
 				$out[ $k ] = max( 1, min( 60, (int) ( $in[ $k ] ?? 7 ) ) ); break;
+			case 'had_umur_anak' === $k:
+				$out[ $k ] = max( 0, min( 30, (int) ( $in[ $k ] ?? 18 ) ) ); break;
 			case 'max_ansuran' === $k:
 				$out[ $k ] = max( 2, min( 36, (int) ( $in[ $k ] ?? 12 ) ) ); break;
 			case 'qr_url' === $k:

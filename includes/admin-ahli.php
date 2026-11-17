@@ -9,6 +9,7 @@ function pk_ahli_query( $args, $limit = 25, $offset = 0 ) {
 	$yr = (int) ( $args['tahun'] ?? pk_year() );
 	$w  = [ '1=1' ]; $v = [];
 	if ( ! empty( $args['status'] ) ) { $w[] = 'a.status=%s'; $v[] = $args['status']; }
+	if ( isset( $args['khairat'] ) && '' !== $args['khairat'] ) { $w[] = 'a.khairat=%s'; $v[] = 'tiada' === $args['khairat'] ? '' : $args['khairat']; }
 	if ( ! empty( $args['kawasan'] ) ) { $w[] = 'a.kawasan=%s'; $v[] = $args['kawasan']; }
 	if ( ! empty( $args['sumber'] ) ) { $w[] = 'a.sumber=%s'; $v[] = $args['sumber']; }
 	if ( ! empty( $args['s'] ) ) {
@@ -41,9 +42,9 @@ function pk_page_ahli() {
 	if ( 'edit' === $action ) { pk_ahli_edit_screen( (int) ( $_GET['id'] ?? 0 ) ); return; }
 	global $wpdb;
 	$base = admin_url( 'admin.php?page=pk-ahli' );
-	foreach ( [ 'status', 'bayar', 'kawasan', 's', 'orderby', 'order', 'sumber' ] as $k ) { if ( '' !== pk_gs( $k ) ) { $base = add_query_arg( $k, rawurlencode( wp_unslash( pk_gs( $k ) ) ), $base ); } }
+	foreach ( [ 'status', 'khairat', 'bayar', 'kawasan', 's', 'orderby', 'order', 'sumber' ] as $k ) { if ( '' !== pk_gs( $k ) ) { $base = add_query_arg( $k, rawurlencode( wp_unslash( pk_gs( $k ) ) ), $base ); } }
 	$args = [
-		'status' => sanitize_key( pk_gs( 'status', '' ) ), 'bayar' => sanitize_key( pk_gs( 'bayar', '' ) ), 'kawasan' => sanitize_text_field( wp_unslash( pk_gs( 'kawasan', '' ) ) ),
+		'status' => sanitize_key( pk_gs( 'status', '' ) ), 'khairat' => sanitize_key( pk_gs( 'khairat', '' ) ), 'bayar' => sanitize_key( pk_gs( 'bayar', '' ) ), 'kawasan' => sanitize_text_field( wp_unslash( pk_gs( 'kawasan', '' ) ) ),
 		's' => sanitize_text_field( wp_unslash( pk_gs( 's', '' ) ) ), 'orderby' => sanitize_key( pk_gs( 'orderby', '' ) ), 'order' => sanitize_key( pk_gs( 'order', '' ) ), 'sumber' => sanitize_key( pk_gs( 'sumber', '' ) ),
 	];
 	$per  = 30; $cur = max( 1, (int) ( $_GET['paged'] ?? 1 ) );
@@ -53,29 +54,30 @@ function pk_page_ahli() {
 	$kaw    = $wpdb->get_col( 'SELECT DISTINCT kawasan FROM ' . pk_t( 'ahli' ) . " WHERE kawasan<>'' ORDER BY kawasan" );
 	$yr     = pk_year();
 
-	pk_admin_header( 'Ahli Khairat Kematian', ' <a href="' . esc_url( admin_url( 'admin.php?page=pk-ahli-baru' ) ) . '" class="page-title-action">+ Daftar Ahli</a> <a href="' . esc_url( wp_nonce_url( add_query_arg( 'action', 'pk_export_ahli', str_replace( 'admin.php?page=pk-ahli', 'admin-post.php?', $base ) ), 'pk_export' ) ) . '" class="page-title-action">Eksport CSV</a>' );
+	pk_admin_header( 'Ahli Kariah & Khairat Kematian', ' <a href="' . esc_url( admin_url( 'admin.php?page=pk-ahli-baru' ) ) . '" class="page-title-action">+ Daftar Ahli Kariah</a> <a href="' . esc_url( wp_nonce_url( add_query_arg( 'action', 'pk_export_ahli', str_replace( 'admin.php?page=pk-ahli', 'admin-post.php?', $base ) ), 'pk_export' ) ) . '" class="page-title-action">Eksport CSV</a>' );
 	echo pk_filter_links( 'status', pk_label( 'status_ahli' ), $counts, $base );
 	?>
 	<form method="get" class="pk-filters">
 		<input type="hidden" name="page" value="pk-ahli">
 		<?php if ( $args['status'] ) : ?><input type="hidden" name="status" value="<?php echo esc_attr( $args['status'] ); ?>"><?php endif; ?>
+		<?php echo pk_select( 'khairat', [ 'aktif' => 'Khairat: Aktif', 'menunggu' => 'Khairat: Menunggu', 'tidak_aktif' => 'Khairat: Tidak Aktif / Luput', 'tiada' => 'Belum menyertai Khairat' ], $args['khairat'], '', 'Semua (Khairat)' ); ?>
 		<?php echo pk_select( 'bayar', [ 'berbayar' => "Yuran $yr dijelaskan", 'belum' => "Belum jelas yuran $yr", 'ansuran' => 'Sedang ansuran' ], $args['bayar'], '', 'Semua status bayaran' ); ?>
 		<?php echo pk_select( 'kawasan', array_combine( $kaw, $kaw ) ?: [], $args['kawasan'], '', 'Semua kawasan' ); ?>
 		<?php echo pk_select( 'sumber', pk_label( 'sumber' ), $args['sumber'], '', 'Semua sumber' ); ?>
-		<input type="search" name="s" value="<?php echo esc_attr( $args['s'] ); ?>" placeholder="Cari nama / No. KP / HP / No. Ahli">
+		<input type="search" name="s" value="<?php echo esc_attr( $args['s'] ); ?>" placeholder="Cari nama / No. KP / HP / No. Kariah">
 		<button class="button">Tapis</button>
 	</form>
 	<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 		<?php wp_nonce_field( 'pk_bulk_ahli' ); ?><input type="hidden" name="action" value="pk_bulk_ahli">
 		<div class="tablenav top"><div class="alignleft actions">
-			<select name="bulk"><option value="">Tindakan pukal</option><option value="aktif">Luluskan / Aktifkan</option><option value="tidak_aktif">Tandakan Tidak Aktif</option><option value="meninggal">Tandakan Meninggal Dunia</option><option value="ditolak">Tolak</option><?php if ( current_user_can( 'manage_options' ) ) : ?><option value="padam">Padam kekal</option><?php endif; ?></select>
+			<select name="bulk"><option value="">Tindakan pukal</option><optgroup label="Ahli Kariah"><option value="aktif">Luluskan Ahli Kariah (No. Kariah selepas yuran disahkan)</option><option value="tidak_aktif">Tandakan Tidak Aktif</option><option value="meninggal">Tandakan Meninggal Dunia</option><option value="ditolak">Tolak</option></optgroup><optgroup label="Khairat Kematian"><option value="k_aktif">Khairat: Aktifkan</option><option value="k_tidak_aktif">Khairat: Tidak Aktif / Luput</option></optgroup><?php if ( current_user_can( 'manage_options' ) ) : ?><option value="padam">Padam kekal</option><?php endif; ?></select>
 			<button class="button" onclick="return this.form.bulk.value!=='padam'||confirm('Padam kekal rekod dipilih?')">Guna</button>
 		</div><?php echo pk_pager( $total, $per, $cur ); ?><div class="alignright pk-count"><?php echo (int) $total; ?> rekod</div></div>
 		<table class="wp-list-table widefat fixed striped pk-list">
 			<thead><tr><td class="check-column"><input type="checkbox" data-pk-checkall></td>
-				<th style="width:9%"><?php echo pk_sort_link( 'No. Ahli', 'no_ahli', $base ); ?></th><th style="width:24%"><?php echo pk_sort_link( 'Nama', 'nama', $base ); ?></th><th>No. HP</th><th><?php echo pk_sort_link( 'Kawasan', 'kawasan', $base ); ?></th><th style="width:7%">Tanggungan</th><th>Yuran <?php echo (int) $yr; ?></th><th>Baki</th><th>Status</th><th><?php echo pk_sort_link( 'Didaftar', 'created_at', $base ); ?></th></tr></thead>
+				<th style="width:9%"><?php echo pk_sort_link( 'No. Kariah', 'no_ahli', $base ); ?></th><th style="width:22%"><?php echo pk_sort_link( 'Nama', 'nama', $base ); ?></th><th>No. HP</th><th><?php echo pk_sort_link( 'Kawasan', 'kawasan', $base ); ?></th><th style="width:7%">Tanggungan</th><th>Ahli Kariah</th><th>Khairat</th><th>Yuran <?php echo (int) $yr; ?></th><th>Baki</th><th><?php echo pk_sort_link( 'Didaftar', 'created_at', $base ); ?></th></tr></thead>
 			<tbody>
-			<?php if ( ! $rows ) : ?><tr><td colspan="10">Tiada rekod.</td></tr><?php endif; ?>
+			<?php if ( ! $rows ) : ?><tr><td colspan="11">Tiada rekod.</td></tr><?php endif; ?>
 			<?php foreach ( $rows as $r ) : $url = admin_url( 'admin.php?page=pk-ahli&action=edit&id=' . $r['id'] ); ?>
 				<tr>
 					<th class="check-column"><input type="checkbox" name="ids[]" value="<?php echo (int) $r['id']; ?>"></th>
@@ -85,9 +87,10 @@ function pk_page_ahli() {
 					<td><a href="tel:<?php echo esc_attr( pk_digits( $r['no_hp'] ) ); ?>"><?php echo esc_html( $r['no_hp'] ); ?></a></td>
 					<td><?php echo esc_html( $r['kawasan'] ?: '—' ); ?></td>
 					<td><?php echo (int) $r['tg_n']; ?></td>
-					<td><?php echo $r['paid'] ? '<span class="pk-badge pk-b-ok">Dijelaskan</span>' : '<span class="pk-badge pk-b-warn">Belum</span>'; ?><?php echo $r['ansuran_n'] ? ' <span class="pk-chip">Ansuran</span>' : ''; ?></td>
-					<td><?php echo $r['baki'] > 0 ? '<b class="pk-red">' . esc_html( pk_rm( $r['baki'] ) ) . '</b>' : '—'; ?></td>
 					<td><?php echo pk_badge( 'status_ahli', $r['status'] ); ?></td>
+					<td><?php echo pk_badge( 'status_khairat', $r['khairat'] ); ?></td>
+					<td><?php if ( in_array( $r['khairat'], [ 'aktif', 'menunggu' ], true ) ) { echo $r['paid'] ? '<span class="pk-badge pk-b-ok">Dijelaskan</span>' : '<span class="pk-badge pk-b-warn">Belum</span>'; echo $r['ansuran_n'] ? ' <span class="pk-chip">Ansuran</span>' : ''; } else { echo '—'; } ?></td>
+					<td><?php echo $r['baki'] > 0 ? '<b class="pk-red">' . esc_html( pk_rm( $r['baki'] ) ) . '</b>' : '—'; ?></td>
 					<td><?php echo esc_html( pk_date( substr( $r['created_at'], 0, 10 ) ) ); ?></td>
 				</tr>
 			<?php endforeach; ?>
@@ -98,9 +101,9 @@ function pk_page_ahli() {
 
 	<div class="pk-box pk-narrow">
 		<h2><span class="dashicons dashicons-update"></span> Jana Yuran Tahunan</h2>
-		<p>Cipta pelan "Yuran Tahunan" (<?php echo esc_html( pk_rm( pk_opt( 'yuran_tahunan' ) ) ); ?>) untuk semua ahli <b>Aktif</b> yang belum mempunyai pelan bagi tahun dipilih. Selamat dijalankan berulang kali (tiada pendua).</p>
+		<p>Cipta pelan "Yuran Tahunan" (<?php echo esc_html( pk_rm( pk_opt( 'yuran_tahunan' ) ) ); ?>) untuk semua ahli <b>Khairat Aktif</b> yang belum mempunyai pelan bagi tahun dipilih. Selamat dijalankan berulang kali (tiada pendua).</p>
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="pk-inline"><?php wp_nonce_field( 'pk_jana' ); ?><input type="hidden" name="action" value="pk_jana">
-			<label>Tahun <input type="number" name="tahun" value="<?php echo (int) $yr; ?>" min="2020" max="2100"></label> <button class="button" onclick="return confirm('Jana yuran tahunan untuk semua ahli aktif?')">Jana</button></form>
+			<label>Tahun <input type="number" name="tahun" value="<?php echo (int) $yr; ?>" min="2020" max="2100"></label> <button class="button" onclick="return confirm('Jana yuran tahunan untuk semua ahli khairat aktif?')">Jana</button></form>
 	</div>
 	</div>
 	<?php
@@ -120,16 +123,23 @@ add_action( 'admin_post_pk_bulk_ahli', function () {
 	foreach ( $ids as $id ) {
 		if ( 'padam' === $op ) { if ( current_user_can( 'manage_options' ) ) { pk_delete_ahli( $id ); } continue; }
 		if ( $id === pk_my_ahli_id() && pk_self_review_blocked( true ) ) { continue; } // AJK cannot change the status of their own record
-		if ( array_key_exists( $op, pk_label( 'status_ahli' ) ) ) { pk_save_ahli_data( [ 'status' => $op ], $id ); }
+		if ( array_key_exists( $op, pk_label( 'status_ahli' ) ) ) { pk_save_ahli_data( [ 'status' => $op ], $id ); pk_log( $id, 'status_kariah', 'Status Ahli Kariah → ' . pk_label( 'status_ahli', $op ) ); }
+		if ( in_array( $op, [ 'k_aktif', 'k_tidak_aktif' ], true ) ) {
+			$a = pk_get_ahli( $id );
+			if ( 'k_aktif' === $op && ! pk_is_kariah_aktif( $a ) ) { $skip = ( $skip ?? 0 ) + 1; continue; } // Khairat requires an active Ahli Kariah
+			pk_save_ahli_data( [ 'khairat' => substr( $op, 2 ) ], $id );
+			pk_log( $id, 'status_khairat', 'Status Khairat → ' . pk_label( 'status_khairat', substr( $op, 2 ) ) );
+		}
 	}
-	pk_back( count( $ids ) . ' rekod dikemas kini.' );
+	$tb = count( array_unique( $GLOBALS['pk_tunggu_bayar'] ?? [] ) );
+	pk_back( count( $ids ) . ' rekod diproses.' . ( $tb ? " $tb diluluskan tetapi menunggu bayaran yuran Ahli Kariah — No. Kariah akan diberikan selepas bayaran disahkan." : '' ) . ( ! empty( $skip ) ? " $skip dilangkau — Khairat hanya untuk Ahli Kariah yang aktif." : '' ) );
 } );
 
 add_action( 'admin_post_pk_jana', function () {
 	pk_guard( 'pk_jana' );
 	global $wpdb;
 	$yr  = max( 2020, min( 2100, (int) pk_p( 'tahun' ) ) );
-	$ids = $wpdb->get_col( $wpdb->prepare( 'SELECT a.id FROM ' . pk_t( 'ahli' ) . " a WHERE a.status='aktif' AND NOT EXISTS(SELECT 1 FROM " . pk_t( 'pelan' ) . " p WHERE p.jenis='khairat' AND p.ref_id=a.id AND p.status<>'batal' AND FIND_IN_SET(%d,p.liputan))", $yr ) );
+	$ids = $wpdb->get_col( $wpdb->prepare( 'SELECT a.id FROM ' . pk_t( 'ahli' ) . " a WHERE a.status='aktif' AND a.khairat='aktif' AND NOT EXISTS(SELECT 1 FROM " . pk_t( 'pelan' ) . " p WHERE p.jenis='khairat' AND p.ref_id=a.id AND p.status<>'batal' AND FIND_IN_SET(%d,p.liputan))", $yr ) );
 	foreach ( $ids as $id ) {
 		pk_pelan_create( [ 'jenis' => 'khairat', 'ref_id' => $id, 'kategori' => 'tahunan', 'liputan' => [ $yr ], 'tajuk' => "Yuran Tahunan $yr", 'jumlah' => pk_opt( 'yuran_tahunan' ), 'cara' => 'sekaligus' ] );
 	}
@@ -149,13 +159,13 @@ function pk_ahli_edit_screen( $id ) {
 	$kaw = array_filter( array_map( 'trim', explode( "\n", (string) pk_opt( 'kawasan' ) ) ) );
 	$yr  = pk_year();
 
-	$title   = $id ? $a['nama'] : 'Daftar Ahli Khairat (Manual)';
+	$title   = $id ? $a['nama'] : 'Daftar Ahli Kariah (Manual)';
 	$actions = $id ? ' <a class="page-title-action" href="' . esc_url( admin_url( 'admin.php?page=pk-ahli&action=print&id=' . $id ) ) . '" target="_blank">Cetak Borang</a> <a class="page-title-action" href="' . esc_url( admin_url( 'admin.php?page=pk-ahli' ) ) . '">← Senarai</a>' : '';
 	pk_admin_header( $title, $actions );
 	if ( $id && $id === pk_my_ahli_id() ) {
 		echo '<div class="notice notice-info"><p><b>Ini rekod keahlian anda sendiri.</b> '
 			. ( pk_self_review_blocked( true )
-				? 'Status, No. Ahli, pasangan &amp; tanggungan, dan pengesahan bayaran untuk rekod ini perlu dibuat oleh AJK lain. Kemas kini maklumat hubungan anda atau mohon perubahan keluarga melalui <a href="' . esc_url( pk_page_url( 'portal' ) ) . '">Portal Ahli</a>.'
+				? 'Status, No. Kariah, pasangan &amp; tanggungan, dan pengesahan bayaran untuk rekod ini perlu dibuat oleh AJK lain. Kemas kini maklumat hubungan anda atau mohon perubahan keluarga melalui <a href="' . esc_url( pk_page_url( 'portal' ) ) . '">Portal Ahli</a>.'
 				: 'Sebagai pentadbir anda boleh menyunting rekod ini, tetapi semua perubahan direkodkan dalam Sejarah Perubahan. Sebaik-baiknya minta AJK lain mengesahkan bayaran dan perubahan keluarga anda.' )
 			. '</p></div>';
 	}
@@ -165,7 +175,7 @@ function pk_ahli_edit_screen( $id ) {
 	<form class="pk-main" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 		<?php wp_nonce_field( 'pk_save_ahli' ); ?><input type="hidden" name="action" value="pk_save_ahli"><input type="hidden" name="id" value="<?php echo (int) $id; ?>">
 		<div class="pk-box">
-			<h2>A — Maklumat Ahli</h2>
+			<h2>A — Maklumat Ahli Kariah</h2>
 			<div class="pk-fgrid">
 				<label class="pk-span2">Nama Penuh *<input type="text" name="nama" required value="<?php echo $f( 'nama' ); ?>"></label>
 				<label>No. Kad Pengenalan<input type="text" name="no_kp" value="<?php echo esc_attr( pk_fmt_kp( $a['no_kp'] ) ); ?>"></label>
@@ -202,9 +212,13 @@ function pk_ahli_edit_screen( $id ) {
 		<div class="pk-box">
 			<h2>Urusan Pejabat / AJK</h2>
 			<div class="pk-fgrid">
-				<label>Status<?php echo pk_select( 'status', pk_label( 'status_ahli' ), $a['status'] ?: 'aktif', '', null ); ?></label>
-				<label>No. Ahli <small>(auto bila Aktif)</small><input type="text" name="no_ahli" value="<?php echo $f( 'no_ahli' ); ?>"></label>
-				<label>Tarikh daftar<input type="date" name="tarikh_daftar" value="<?php echo $f( 'tarikh_daftar' ) ?: esc_attr( $id ? '' : pk_today() ); ?>"></label>
+				<label>Status Ahli Kariah<?php echo pk_select( 'status', pk_label( 'status_ahli' ), $a['status'] ?: 'aktif', '', null ); ?></label>
+				<label>No. Kariah <small>(diberikan oleh sistem)</small><input type="text" value="<?php echo $f( 'no_ahli' ); ?>" readonly disabled placeholder="Belum diberikan"><small class="description">Diberikan automatik selepas pendaftaran diluluskan <b>dan</b> yuran Ahli Kariah disahkan. Tidak boleh diisi atau diubah secara manual.</small></label>
+				<?php if ( $id ) : ?>
+				<label>Status Khairat Kematian<?php echo pk_select( 'khairat', pk_label( 'status_khairat' ), $a['khairat'], '', null ); ?><small class="description">Khairat hanya boleh Aktif jika Ahli Kariah Aktif.</small></label>
+				<label>Tarikh sertai khairat<input type="date" name="tarikh_khairat" value="<?php echo $f( 'tarikh_khairat' ); ?>"></label>
+				<?php endif; ?>
+				<label>Tarikh daftar kariah<input type="date" name="tarikh_daftar" value="<?php echo $f( 'tarikh_daftar' ) ?: esc_attr( $id ? '' : pk_today() ); ?>"></label>
 				<label>Sumber<?php echo pk_select( 'sumber', pk_label( 'sumber' ), $a['sumber'] ?: 'manual', '', null ); ?></label>
 				<label class="pk-span2">Catatan<textarea name="catatan" rows="3"><?php echo esc_textarea( $a['catatan'] ?? '' ); ?></textarea></label>
 			</div>
@@ -215,11 +229,19 @@ function pk_ahli_edit_screen( $id ) {
 			<?php if ( pk_self_review_blocked( true ) ) : ?><p class="description">Rekod anda akan berstatus <i>Menunggu Pengesahan</i> dan sebarang bayaran perlu disahkan oleh AJK lain.</p><?php endif; ?>
 		</div>
 		<?php endif; ?>
+		<?php if ( ! $id && (float) pk_opt( 'yuran_kariah' ) > 0 ) : ?>
+		<div class="pk-box">
+			<h2>Yuran Ahli Kariah</h2>
+			<div class="pk-fgrid">
+				<label class="pk-span2">Yuran pendaftaran Ahli Kariah (<?php echo esc_html( pk_rm( pk_opt( 'yuran_kariah' ) ) ); ?>, sekali sahaja)<?php echo pk_select( 'kariah_yuran', [ 'bayar' => 'Diterima sekarang (tunai / kaunter)', 'belum' => 'Belum dibayar — cipta pelan bayaran', 'kecuali' => 'Dikecualikan / tiada yuran' ], 'bayar', '', null ); ?></label>
+			</div>
+		</div>
+		<?php endif; ?>
 		<?php if ( ! $id ) : ?>
 		<div class="pk-box">
-			<h2>Yuran &amp; Bayaran</h2>
+			<h2>Khairat Kematian — Yuran &amp; Bayaran</h2>
 			<div class="pk-fgrid">
-				<label>Pelan yuran<?php echo pk_select( 'pelan_awal', [ 'baru' => 'Ahli baharu — ' . pk_rm( pk_opt( 'yuran_daftar' ) + pk_opt( 'yuran_tahunan' ) ) . " (Daftar + $yr)", 'tahunan' => "Ahli sedia ada — Tahunan $yr " . pk_rm( pk_opt( 'yuran_tahunan' ) ), 'tiada' => 'Tiada / tambah kemudian' ], 'baru', '', null ); ?></label>
+				<label class="pk-span2">Khairat Kematian<?php echo pk_select( 'pelan_awal', [ 'baru' => 'Daftar Khairat baharu — ' . pk_rm( pk_opt( 'yuran_daftar' ) + pk_opt( 'yuran_tahunan' ) ) . " (Daftar + $yr)", 'tahunan' => "Ahli khairat sedia ada — Tahunan $yr " . pk_rm( pk_opt( 'yuran_tahunan' ) ), 'tiada' => 'Ahli Kariah sahaja — belum sertai Khairat' ], 'baru', '', null ); ?><small class="description">Khairat hanya untuk Ahli Kariah. Jika Status Ahli Kariah bukan Aktif, Khairat akan berstatus Menunggu.</small></label>
 				<label>Cara<?php echo pk_select( 'cara', pk_label( 'mod' ), 'sekaligus', 'data-pk-cara', null ); ?></label>
 				<label class="pk-ans">Bil. ansuran<input type="number" name="bil_ansuran" min="2" max="36" value="3"></label>
 				<label>Bayaran diterima sekarang (RM)<input type="number" step="0.01" min="0" name="bayar_sekarang" placeholder="0"></label>
@@ -228,7 +250,7 @@ function pk_ahli_edit_screen( $id ) {
 			</div>
 		</div>
 		<?php endif; ?>
-		<p class="pk-sticky"><button class="button button-primary button-large"><?php echo $id ? 'Simpan Perubahan' : 'Daftar Ahli'; ?></button>
+		<p class="pk-sticky"><button class="button button-primary button-large"><?php echo $id ? 'Simpan Perubahan' : 'Daftar Ahli Kariah'; ?></button>
 		<?php if ( $id && current_user_can( 'manage_options' ) ) : ?><a href="#" class="pk-link-del" style="margin-left:1rem" onclick="if(confirm('Padam kekal ahli ini berserta semua rekod bayaran?')){document.getElementById('pk-del-ahli').submit()}return false">Padam rekod</a><?php endif; ?></p>
 	</form>
 	<?php if ( $id ) : ?>
@@ -238,11 +260,15 @@ function pk_ahli_edit_screen( $id ) {
 		[ $dob, $sex ] = pk_kp_info( $a['no_kp'] );
 		$age  = pk_age( $dob );
 		$paid = pk_ahli_paid_year( $id, $yr );
-		echo '<div class="pk-box pk-summary"><div class="pk-sum-top">' . pk_badge( 'status_ahli', $a['status'] ) . ' <span class="pk-noahli">' . esc_html( $a['no_ahli'] ?: 'Tiada No. Ahli' ) . '</span></div>';
-		echo '<dl><dt>Yuran ' . $yr . '</dt><dd>' . ( $paid ? '<span class="pk-badge pk-b-ok">Dijelaskan</span>' : '<span class="pk-badge pk-b-warn">Belum dijelaskan</span>' ) . '</dd>';
+		echo '<div class="pk-box pk-summary"><div class="pk-sum-top">' . pk_badge( 'status_ahli', $a['status'] ) . ' <span class="pk-noahli">' . esc_html( $a['no_ahli'] ?: 'Tiada No. Kariah' ) . '</span></div>';
+		echo '<dl><dt>Khairat Kematian</dt><dd>' . pk_badge( 'status_khairat', $a['khairat'] ) . ( $a['tarikh_khairat'] ? ' <small>sejak ' . esc_html( pk_date( $a['tarikh_khairat'] ) ) . '</small>' : '' ) . '</dd>';
+		echo '<dt>Yuran ' . $yr . '</dt><dd>' . ( $paid ? '<span class="pk-badge pk-b-ok">Dijelaskan</span>' : '<span class="pk-badge pk-b-warn">Belum dijelaskan</span>' ) . '</dd>';
 		echo '<dt>Umur / Jantina</dt><dd>' . ( null !== $age ? (int) $age . ' tahun' : '—' ) . ' · ' . ( 'L' === $sex ? 'Lelaki' : ( 'P' === $sex ? 'Perempuan' : '—' ) ) . '</dd>';
-		echo '<dt>Isi rumah dilindungi</dt><dd>' . ( 1 + ( $a['p_nama'] ? 1 : 0 ) + count( array_filter( $tg, fn( $r ) => ! empty( $r['nama'] ) ) ) ) . ' orang</dd>';
-		echo '<dt>Didaftar</dt><dd>' . esc_html( pk_date( $a['tarikh_daftar'] ) ) . ' · ' . esc_html( pk_label( 'sumber', $a['sumber'] ) ) . '</dd></dl></div>';
+		$tg_ok = array_filter( $tg, fn( $r ) => ! empty( $r['nama'] ) && pk_tg_dilindungi( $r ) );
+		$tg_18 = array_filter( $tg, fn( $r ) => ! empty( $r['nama'] ) && ! pk_tg_dilindungi( $r ) );
+		echo '<dt>Isi rumah dilindungi</dt><dd>' . ( 1 + ( $a['p_nama'] ? 1 : 0 ) + count( $tg_ok ) ) . ' orang'
+			. ( $tg_18 ? '<br><small class="pk-red">Anak ' . (int) pk_opt( 'had_umur_anak' ) . ' tahun ke atas (perlu daftar sendiri): ' . esc_html( implode( ', ', array_column( $tg_18, 'nama' ) ) ) . '</small>' : '' ) . '</dd>';
+		echo '<dt>Ahli Kariah sejak</dt><dd>' . esc_html( pk_date( $a['tarikh_daftar'] ) ) . ' · ' . esc_html( pk_label( 'sumber', $a['sumber'] ) ) . '</dd></dl></div>';
 		if ( $pend = pk_kemaskini_pending( $id ) ) {
 			echo '<div class="pk-box pk-pending"><h2><span class="dashicons dashicons-warning"></span> Permohonan kemas kini menunggu kelulusan</h2>' . pk_kemaskini_diff( $a, json_decode( $pend['data'], true ) ?: [] )
 				. '<p><a class="button button-primary" href="' . esc_url( admin_url( 'admin.php?page=pk-kemaskini' ) ) . '">Semak &amp; luluskan</a></p></div>';
@@ -276,10 +302,12 @@ add_action( 'admin_post_pk_save_ahli', function () {
 	$data['email'] = sanitize_email( $data['email'] ?? '' );
 	$data['tarikh_daftar'] = pk_date_in( $data['tarikh_daftar'] ?? '' );
 	if ( ! array_key_exists( $data['status'] ?? '', pk_label( 'status_ahli' ) ) ) { $data['status'] = 'aktif'; }
+	if ( isset( $data['khairat'] ) && ! array_key_exists( $data['khairat'], pk_label( 'status_khairat' ) ) ) { unset( $data['khairat'] ); }
+	if ( isset( $data['tarikh_khairat'] ) ) { $data['tarikh_khairat'] = pk_date_in( $data['tarikh_khairat'] ); }
 	if ( '' === trim( $data['nama'] ?? '' ) ) { pk_back( 'Nama diperlukan.' ); }
 	// AJK editing their own record: status and No. Ahli stay as they are (another AJK must approve)
 	if ( $id && $id === pk_my_ahli_id() && pk_self_review_blocked( true ) && ( $cur = pk_get_ahli( $id ) ) ) {
-		$data['status'] = $cur['status']; $data['no_ahli'] = $cur['no_ahli'];
+		$data['status'] = $cur['status']; $data['no_ahli'] = $cur['no_ahli']; $data['khairat'] = $cur['khairat']; $data['tarikh_khairat'] = $cur['tarikh_khairat'];
 		foreach ( PK_KELUARGA_FIELDS as $k ) { $data[ $k ] = $cur[ $k ]; }
 		$_POST['tg'] = pk_tanggungan_get( $id );
 	}
@@ -290,6 +318,11 @@ add_action( 'admin_post_pk_save_ahli', function () {
 	$before = $id ? pk_get_ahli( $id ) : null;
 	$self = $new && pk_p( 'rekod_saya' ) && ! pk_ahli_for_user();
 	if ( $self && pk_self_review_blocked( true ) ) { $data['status'] = 'menunggu'; $data['no_ahli'] = ''; }
+	if ( $new ) {
+		$pa = pk_p( 'pelan_awal' );
+		$data['khairat'] = in_array( $pa, [ 'baru', 'tahunan' ], true ) ? ( 'aktif' === $data['status'] && ! ( $self && pk_self_review_blocked( true ) ) ? 'aktif' : 'menunggu' ) : '';
+		$data['tarikh_khairat'] = 'aktif' === $data['khairat'] ? ( $data['tarikh_daftar'] ?: pk_today() ) : null;
+	}
 	$id = pk_save_ahli_data( $data, $id );
 	if ( $self ) {
 		global $wpdb;
@@ -301,12 +334,24 @@ add_action( 'admin_post_pk_save_ahli', function () {
 		foreach ( $data as $k => $v ) { if ( 'catatan' !== $k && array_key_exists( $k, $before ) && (string) $before[ $k ] !== (string) ( $k === 'no_kp' || $k === 'p_kp' ? pk_digits( $v ) : ( in_array( $k, [ 'nama', 'p_nama' ], true ) ? mb_strtoupper( trim( $v ) ) : $v ) ) ) { $diff[ $k ] = [ $before[ $k ], $v ]; } }
 		if ( $diff ) { pk_log( $id, 'kemaskini_ajk', $diff ); }
 	} else {
-		pk_log( $id, 'daftar', 'Didaftarkan oleh AJK' );
+		pk_log( $id, 'daftar', 'Didaftarkan oleh AJK' . ( ! empty( $data['khairat'] ) ? ' (Ahli Kariah + Khairat)' : ' (Ahli Kariah)' ) );
 	}
 	pk_tanggungan_replace( $id, pk_tanggungan_from_post() );
 
 	if ( $new ) {
-		$yr = pk_year();
+		$yr  = pk_year();
+		$fee = (float) pk_opt( 'yuran_kariah' );
+		$ky  = pk_p( 'kariah_yuran', 'bayar' );
+		if ( $fee > 0 && 'kecuali' === $ky ) {
+			pk_log( $id, 'kariah_kecuali', 'Yuran Ahli Kariah dikecualikan oleh AJK ' . wp_get_current_user()->user_login );
+			pk_save_ahli_data( [], $id );
+		}
+		if ( $fee > 0 && in_array( $ky, [ 'bayar', 'belum' ], true ) ) {
+			$kp_id = pk_pelan_create( [ 'jenis' => 'khairat', 'ref_id' => $id, 'kategori' => 'kariah', 'tajuk' => 'Yuran Pendaftaran Ahli Kariah', 'jumlah' => $fee, 'cara' => 'sekaligus' ] );
+			if ( 'bayar' === $ky ) {
+				pk_bayaran_create( [ 'pelan_id' => $kp_id, 'jumlah' => $fee, 'kaedah' => pk_p( 'kaedah' ), 'no_resit' => pk_p( 'no_resit' ), 'status' => ( $self && pk_self_review_blocked( true ) ) ? 'menunggu' : 'sah', 'sumber' => 'manual' ] );
+			}
+		}
 		$pa = pk_p( 'pelan_awal' );
 		if ( in_array( $pa, [ 'baru', 'tahunan' ], true ) ) {
 			$amt = ( 'baru' === $pa ? pk_opt( 'yuran_daftar' ) : 0 ) + pk_opt( 'yuran_tahunan' );
@@ -318,7 +363,10 @@ add_action( 'admin_post_pk_save_ahli', function () {
 			}
 		}
 	}
-	pk_back( $new ? 'Ahli didaftarkan.' : 'Maklumat ahli disimpan.', admin_url( 'admin.php?page=pk-ahli&action=edit&id=' . $id ) );
+	if ( $new && 'aktif' === ( $data['khairat'] ?? '' ) ) { pk_save_ahli_data( [ 'khairat' => 'aktif' ], $id ); } // re-apply once the kariah fee is settled (demoted to Menunggu if not)
+	$fin = pk_get_ahli( $id );
+	$msg = ( $new ? 'Ahli didaftarkan.' : 'Maklumat ahli disimpan.' ) . ( 'lulus' === $fin['status'] ? ' Pendaftaran diluluskan — No. Kariah akan diberikan secara automatik selepas yuran Ahli Kariah disahkan.' : '' );
+	pk_back( $msg, admin_url( 'admin.php?page=pk-ahli&action=edit&id=' . $id ) );
 } );
 
 add_action( 'admin_post_pk_del_ahli', function () {
@@ -338,7 +386,7 @@ add_action( 'admin_init', function () {
 	$tg = pk_tanggungan_get( $a['id'] );
 	$pl = pk_pelan_list( 'khairat', $a['id'] );
 	$e  = fn( $v ) => esc_html( $v ?: '' );
-	?><!doctype html><html lang="ms"><head><meta charset="utf-8"><title><?php echo $e( $a['nama'] ); ?> — Borang Khairat</title>
+	?><!doctype html><html lang="ms"><head><meta charset="utf-8"><title><?php echo $e( $a['nama'] ); ?> — Borang Ahli Kariah &amp; Khairat</title>
 	<style>
 	@page { size: A4; margin: 14mm; } body { font: 11pt/1.35 Arial, sans-serif; color: #111; max-width: 190mm; margin: 0 auto; }
 	.hd { text-align: center; border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 10px; position: relative; } .hd h1 { font-size: 14pt; margin: 0; } .hd h2 { font-size: 13pt; margin: 2px 0; } .hd p { margin: 2px 0; font-size: 8.5pt; }
@@ -350,10 +398,10 @@ add_action( 'admin_init', function () {
 	.small { font-size: 8.5pt; } .pbtn { position: fixed; top: 10px; right: 10px; } @media print { .pbtn { display: none; } }
 	</style></head><body>
 	<button class="pbtn" onclick="window.print()">🖨 Cetak</button>
-	<div class="hd"><div class="no">No. Ahli<br><b><?php echo $e( $a['no_ahli'] ?: '________' ); ?></b></div>
-		<h1>BADAN KHAIRAT KEMATIAN</h1><h2><?php echo esc_html( mb_strtoupper( pk_nama() ) ); ?></h2>
+	<div class="hd"><div class="no">No. Kariah<br><b><?php echo $e( $a['no_ahli'] ?: '________' ); ?></b></div>
+		<h1>AHLI KARIAH &amp; BADAN KHAIRAT KEMATIAN</h1><h2><?php echo esc_html( mb_strtoupper( pk_nama() ) ); ?></h2>
 		<?php if ( pk_opt( 'alamat_masjid' ) ) : ?><p><?php echo esc_html( preg_replace( '/\s*\n\s*/', ', ', trim( pk_opt( 'alamat_masjid' ) ) ) ); ?></p><?php endif; ?>
-		<p><b>BORANG PENDAFTARAN KEAHLIAN KHAIRAT KEMATIAN</b></p></div>
+		<p><b>BORANG PENDAFTARAN AHLI KARIAH / KEAHLIAN KHAIRAT KEMATIAN</b></p></div>
 	<h3>BAHAGIAN A : MAKLUMAT AHLI</h3>
 	<table class="kv"><tr><td>Nama Penuh</td><td colspan="3"><?php echo $e( $a['nama'] ); ?></td></tr>
 		<tr><td>No. KP</td><td><?php echo $e( pk_fmt_kp( $a['no_kp'] ) ); ?></td><td>No. HP</td><td><?php echo $e( $a['no_hp'] ); ?></td></tr>
@@ -380,7 +428,7 @@ add_action( 'admin_init', function () {
 	<p class="small">Saya seperti nama di atas bersetuju dengan terma dan syarat yang telah ditetapkan.</p>
 	<div class="sig"><div>Tandatangan Ahli</div><div>Tarikh</div></div>
 	<h3>URUSAN PEJABAT / AJK</h3>
-	<table class="kv"><tr><td>Tarikh terima</td><td><?php echo esc_html( pk_date( substr( $a['created_at'], 0, 10 ) ) ); ?></td><td>Status</td><td><?php echo esc_html( pk_label( 'status_ahli', $a['status'] ) ); ?></td></tr></table>
+	<table class="kv"><tr><td>Tarikh terima</td><td><?php echo esc_html( pk_date( substr( $a['created_at'], 0, 10 ) ) ); ?></td><td>Ahli Kariah</td><td><?php echo esc_html( pk_label( 'status_ahli', $a['status'] ) ); ?></td></tr><tr><td>Tarikh daftar kariah</td><td><?php echo esc_html( pk_date( $a['tarikh_daftar'] ) ); ?></td><td>Khairat</td><td><?php echo esc_html( pk_label( 'status_khairat', $a['khairat'] ) ); ?></td></tr></table>
 	<div class="sig"><div>Disahkan oleh (Tandatangan AJK)</div><div>Disemak oleh (Tandatangan Nazir)</div></div>
 	</body></html><?php
 	exit;

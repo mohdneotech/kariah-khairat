@@ -29,6 +29,7 @@
     });
 
     function total() {
+      if (type === 'kariah') return N(PK.kariah);
       if (type === 'khairat') {
         var baru = (form.querySelector('[name="jenis_mohon"]:checked') || {}).value === 'baru';
         var tg = baru ? 0 : form.querySelectorAll('[name="tunggakan[]"]:checked').length;

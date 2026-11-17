@@ -8,17 +8,20 @@ function pk_dashboard_data() {
 	$musim = pk_opt( 'musim_korban' );
 
 	$status = array_map( fn( $r ) => (int) $r->n, $wpdb->get_results( "SELECT status, COUNT(*) n FROM $A GROUP BY status", OBJECT_K ) );
-	$aktif  = (int) ( $status['aktif'] ?? 0 );
+	$kariah = (int) ( $status['aktif'] ?? 0 );                       // active Ahli Kariah (have No. Kariah)
+	$khst   = array_map( fn( $r ) => (int) $r->n, $wpdb->get_results( "SELECT khairat, COUNT(*) n FROM $A WHERE status IN ('aktif','menunggu') GROUP BY khairat", OBJECT_K ) );
+	$KH     = "a.status='aktif' AND a.khairat='aktif'";                // active Khairat member
+	$aktif  = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $A a WHERE $KH" );
 	$jiwa   = $aktif
-		+ (int) $wpdb->get_var( "SELECT COUNT(*) FROM $A WHERE status='aktif' AND p_nama<>''" )
-		+ (int) $wpdb->get_var( "SELECT COUNT(*) FROM $T t JOIN $A a ON a.id=t.ahli_id WHERE a.status='aktif'" );
-	$paid   = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM $A a WHERE a.status='aktif' AND EXISTS(SELECT 1 FROM $P p WHERE p.jenis='khairat' AND p.ref_id=a.id AND p.status='selesai' AND FIND_IN_SET(%d,p.liputan))", $yr ) );
-	$ansur  = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM $A a WHERE a.status='aktif' AND NOT EXISTS(SELECT 1 FROM $P p WHERE p.jenis='khairat' AND p.ref_id=a.id AND p.status='selesai' AND FIND_IN_SET(%d,p.liputan)) AND EXISTS(SELECT 1 FROM $P p WHERE p.jenis='khairat' AND p.ref_id=a.id AND p.status='aktif' AND FIND_IN_SET(%d,p.liputan))", $yr, $yr ) );
+		+ (int) $wpdb->get_var( "SELECT COUNT(*) FROM $A a WHERE $KH AND a.p_nama<>''" )
+		+ (int) $wpdb->get_var( "SELECT COUNT(*) FROM $T t JOIN $A a ON a.id=t.ahli_id WHERE $KH AND " . pk_tg_dilindungi_sql() );
+	$paid   = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM $A a WHERE $KH AND EXISTS(SELECT 1 FROM $P p WHERE p.jenis='khairat' AND p.ref_id=a.id AND p.status='selesai' AND FIND_IN_SET(%d,p.liputan))", $yr ) );
+	$ansur  = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM $A a WHERE $KH AND NOT EXISTS(SELECT 1 FROM $P p WHERE p.jenis='khairat' AND p.ref_id=a.id AND p.status='selesai' AND FIND_IN_SET(%d,p.liputan)) AND EXISTS(SELECT 1 FROM $P p WHERE p.jenis='khairat' AND p.ref_id=a.id AND p.status='aktif' AND FIND_IN_SET(%d,p.liputan))", $yr, $yr ) );
 
 	$kutip  = (float) $wpdb->get_var( $wpdb->prepare( "SELECT COALESCE(SUM(jumlah),0) FROM $B WHERE status='sah' AND YEAR(tarikh)=%d", $yr ) );
 	$baki   = (float) $wpdb->get_var( "SELECT COALESCE(SUM(p.jumlah - COALESCE((SELECT SUM(b.jumlah) FROM $B b WHERE b.pelan_id=p.id AND b.status='sah'),0)),0) FROM $P p WHERE p.status='aktif'" );
 	$pend_b = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $B WHERE status='menunggu'" );
-	$pend_a = (int) ( $status['menunggu'] ?? 0 );
+	$pend_a = (int) ( $status['menunggu'] ?? 0 ) + ( $pend_kh = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $A WHERE status='aktif' AND khairat='menunggu'" ) );
 	$pend_k = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $K WHERE status='menunggu'" );
 	$pend_u = (int) $wpdb->get_var( 'SELECT COUNT(*) FROM ' . pk_t( 'kemaskini' ) . " WHERE status='menunggu'" );
 	$portal = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $A WHERE status='aktif' AND user_id>0" );
@@ -61,34 +64,35 @@ function pk_dashboard_data() {
 	$mm   = [ 'khairat' => [ 'sekaligus' => 0, 'ansuran' => 0 ], 'korban' => [ 'sekaligus' => 0, 'ansuran' => 0 ] ];
 	foreach ( $mode as $r ) { $mm[ $r['jenis'] ][ $r['cara'] ] = (int) $r['n']; }
 
-	return compact( 'yr', 'musim', 'status', 'aktif', 'jiwa', 'paid', 'ansur', 'kutip', 'baki', 'pend_b', 'pend_a', 'pend_k', 'pend_u', 'portal', 'bah', 'kpes', 'labels', 's_reg', 's_col', 'age', 'unk', 'kaw', 'sek', 'hhb', 'hub', 'mm' );
+	return compact( 'yr', 'musim', 'status', 'kariah', 'khst', 'pend_kh', 'aktif', 'jiwa', 'paid', 'ansur', 'kutip', 'baki', 'pend_b', 'pend_a', 'pend_k', 'pend_u', 'portal', 'bah', 'kpes', 'labels', 's_reg', 's_col', 'age', 'unk', 'kaw', 'sek', 'hhb', 'hub', 'mm' );
 }
 
 function pk_page_dashboard() {
 	global $wpdb;
 	$d  = pk_dashboard_data();
 	$yr = $d['yr'];
-	pk_admin_header( 'Papan Pemuka Kariah', ' <a href="' . esc_url( admin_url( 'admin.php?page=pk-ahli-baru' ) ) . '" class="page-title-action">+ Daftar Ahli</a> <a href="' . esc_url( admin_url( 'admin.php?page=pk-korban-baru' ) ) . '" class="page-title-action">+ Daftar Korban</a>' );
+	pk_admin_header( 'Papan Pemuka Kariah', ' <a href="' . esc_url( admin_url( 'admin.php?page=pk-ahli-baru' ) ) . '" class="page-title-action">+ Daftar Ahli Kariah</a> <a href="' . esc_url( admin_url( 'admin.php?page=pk-korban-baru' ) ) . '" class="page-title-action">+ Daftar Korban</a>' );
 	if ( current_user_can( 'manage_options' ) ) { pk_private_dir_warning(); }
 	echo pk_dashboard_my_record();
 	$pct = $d['aktif'] ? round( $d['paid'] / $d['aktif'] * 100 ) : 0;
 	$pend = $d['pend_a'] + $d['pend_k'] + $d['pend_b'] + $d['pend_u'];
 	?>
 	<div class="pk-kpis">
-		<div><span>Ahli khairat aktif</span><b><?php echo number_format_i18n( $d['aktif'] ); ?></b><small><?php echo number_format_i18n( $d['jiwa'] ); ?> jiwa dilindungi · <?php echo (int) $d['portal']; ?> guna portal</small></div>
+		<div><span>Ahli kariah aktif</span><b><?php echo number_format_i18n( $d['kariah'] ); ?></b><small><?php echo (int) ( $d['status']['menunggu'] ?? 0 ); ?> menunggu kelulusan · <?php echo (int) $d['portal']; ?> guna portal</small></div>
+		<div><span>Ahli khairat aktif</span><b><?php echo number_format_i18n( $d['aktif'] ); ?></b><small><?php echo number_format_i18n( $d['jiwa'] ); ?> jiwa dilindungi · <?php echo $d['kariah'] ? round( $d['aktif'] / $d['kariah'] * 100 ) : 0; ?>% ahli kariah</small></div>
 		<div><span>Yuran <?php echo (int) $yr; ?> dijelaskan</span><b><?php echo (int) $pct; ?>%</b><small><?php echo (int) $d['paid']; ?> / <?php echo (int) $d['aktif']; ?> ahli · <?php echo (int) $d['ansur']; ?> sedang ansuran</small><div class="pk-bar"><i style="width:<?php echo (int) $pct; ?>%"></i></div></div>
 		<div><span>Kutipan disahkan <?php echo (int) $yr; ?></span><b><?php echo esc_html( pk_rm( $d['kutip'] ) ); ?></b><small>khairat + korban/aqiqah</small></div>
 		<div><span>Baki belum dibayar</span><b class="pk-red"><?php echo esc_html( pk_rm( $d['baki'] ) ); ?></b><small>semua pelan aktif / ansuran</small></div>
 		<div><span>Korban <?php echo esc_html( $d['musim'] ); ?></span><b><?php echo (int) $d['bah']; ?> <small class="pk-inl">bahagian</small></b><small><?php echo (int) $d['kpes']; ?> pendaftaran · ≈ <?php echo (int) ceil( $d['bah'] / 7 ); ?> ekor lembu</small></div>
-		<a class="<?php echo $pend ? 'pk-kpi-alert' : ''; ?>" href="<?php echo esc_url( admin_url( 'admin.php?page=pk-bayaran&status=menunggu' ) ); ?>"><span>Perlu tindakan</span><b><?php echo (int) $pend; ?></b><small><?php echo (int) $d['pend_a']; ?> ahli · <?php echo (int) $d['pend_k']; ?> korban · <?php echo (int) $d['pend_b']; ?> bayaran · <?php echo (int) $d['pend_u']; ?> kemas kini</small></a>
+		<a class="<?php echo $pend ? 'pk-kpi-alert' : ''; ?>" href="<?php echo esc_url( admin_url( 'admin.php?page=pk-bayaran&status=menunggu' ) ); ?>"><span>Perlu tindakan</span><b><?php echo (int) $pend; ?></b><small><?php echo (int) ( $d['pend_a'] - $d['pend_kh'] ); ?> kariah · <?php echo (int) $d['pend_kh']; ?> khairat · <?php echo (int) $d['pend_k']; ?> korban · <?php echo (int) $d['pend_b']; ?> bayaran · <?php echo (int) $d['pend_u']; ?> kemas kini</small></a>
 	</div>
 
 	<div class="pk-charts">
-		<div class="pk-chart pk-w2"><h3>Pendaftaran ahli — 12 bulan</h3><div class="pk-cv"><canvas id="pkc-reg" height="220"></canvas></div></div>
-		<div class="pk-chart"><h3>Status keahlian</h3><div class="pk-cv"><canvas id="pkc-status" height="220"></canvas></div></div>
+		<div class="pk-chart pk-w2"><h3>Pendaftaran Ahli Kariah — 12 bulan</h3><div class="pk-cv"><canvas id="pkc-reg" height="220"></canvas></div></div>
+		<div class="pk-chart"><h3>Status Ahli Kariah</h3><div class="pk-cv"><canvas id="pkc-status" height="220"></canvas></div></div>
 		<div class="pk-chart pk-w2"><h3>Kutipan disahkan — 12 bulan (RM)</h3><div class="pk-cv"><canvas id="pkc-col" height="220"></canvas></div></div>
 		<div class="pk-chart"><h3>Cara bayaran (bil. pelan)</h3><div class="pk-cv"><canvas id="pkc-mode" height="220"></canvas></div></div>
-		<div class="pk-chart pk-w2"><h3>Umur &amp; jantina ahli aktif <small>(daripada No. KP<?php echo $d['unk'] ? ', ' . (int) $d['unk'] . ' tidak diketahui' : ''; ?>)</small></h3><div class="pk-cv"><canvas id="pkc-age" height="220"></canvas></div></div>
+		<div class="pk-chart pk-w2"><h3>Umur &amp; jantina Ahli Kariah aktif <small>(daripada No. KP<?php echo $d['unk'] ? ', ' . (int) $d['unk'] . ' tidak diketahui' : ''; ?>)</small></h3><div class="pk-cv"><canvas id="pkc-age" height="220"></canvas></div></div>
 		<div class="pk-chart"><h3>Saiz isi rumah dilindungi</h3><div class="pk-cv"><canvas id="pkc-hh" height="220"></canvas></div></div>
 		<div class="pk-chart"><h3>Kawasan / taman</h3><div class="pk-cv"><canvas id="pkc-kaw" height="240"></canvas></div></div>
 		<div class="pk-chart"><h3>Sektor pekerjaan</h3><div class="pk-cv"><canvas id="pkc-sek" height="240"></canvas></div></div>
@@ -146,11 +150,11 @@ function pk_dashboard_my_record() {
 	$me = pk_ahli_for_user();
 	$portal = pk_page_url( 'portal' );
 	if ( ! $me ) {
-		return '<div class="pk-me pk-me-empty"><span class="dashicons dashicons-id-alt"></span><div><b>Rekod Ahli Saya</b><br><span class="description">Anda juga ahli kariah? Pautkan rekod keahlian sedia ada atau daftar sebagai ahli — kemudian urus maklumat anda sendiri di Portal Ahli.</span></div>'
+		return '<div class="pk-me pk-me-empty"><span class="dashicons dashicons-id-alt"></span><div><b>Rekod Ahli Saya</b><br><span class="description">Anda juga ahli kariah? Pautkan rekod keahlian sedia ada atau daftar sebagai Ahli Kariah — kemudian urus maklumat anda sendiri di Portal Ahli.</span></div>'
 			. '<a class="button button-primary" href="' . esc_url( $portal ) . '">Pautkan / Daftar Rekod Saya</a></div>';
 	}
 	$paid = pk_ahli_paid_year( $me['id'], pk_year() );
-	return '<div class="pk-me"><span class="dashicons dashicons-id-alt"></span><div><b>Rekod Ahli Saya:</b> ' . esc_html( $me['nama'] ) . ' · ' . esc_html( $me['no_ahli'] ?: 'tiada No. Ahli' ) . ' ' . pk_badge( 'status_ahli', $me['status'] )
+	return '<div class="pk-me"><span class="dashicons dashicons-id-alt"></span><div><b>Rekod Ahli Saya:</b> ' . esc_html( $me['nama'] ) . ' · ' . esc_html( $me['no_ahli'] ?: 'tiada No. Kariah' ) . ' ' . pk_badge( 'status_ahli', $me['status'] ) . ' · Khairat ' . pk_badge( 'status_khairat', $me['khairat'] )
 		. ' · Yuran ' . pk_year() . ': ' . ( $paid ? '<span class="pk-badge pk-b-ok">Dijelaskan</span>' : '<span class="pk-badge pk-b-warn">Belum</span>' ) . '</div>'
 		. '<a class="button button-primary" href="' . esc_url( $portal ) . '">Buka Portal Ahli</a> <a class="button" href="' . esc_url( admin_url( 'admin.php?page=pk-ahli&action=edit&id=' . $me['id'] ) ) . '">Lihat rekod</a></div>';
 }

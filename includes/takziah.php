@@ -110,11 +110,11 @@ function pk_tz_edit_screen( $id ) {
 		<input type="hidden" name="ahli_id" value="<?php echo (int) ( $ahli['id'] ?? 0 ); ?>">
 		<h2>Maklumat Allahyarham / Allahyarhamah</h2>
 		<?php if ( $ahli ) : ?>
-			<p>Dipautkan kepada rekod ahli: <a href="<?php echo esc_url( admin_url( 'admin.php?page=pk-ahli&action=edit&id=' . $ahli['id'] ) ); ?>"><b><?php echo esc_html( $ahli['nama'] ); ?></b></a> (<?php echo esc_html( $ahli['no_ahli'] ?: 'tiada No. Ahli' ); ?>) — <?php echo pk_badge( 'status_ahli', $ahli['status'] ); ?>
+			<p>Dipautkan kepada rekod ahli: <a href="<?php echo esc_url( admin_url( 'admin.php?page=pk-ahli&action=edit&id=' . $ahli['id'] ) ); ?>"><b><?php echo esc_html( $ahli['nama'] ); ?></b></a> (<?php echo esc_html( $ahli['no_ahli'] ?: 'tiada No. Kariah' ); ?>) — <?php echo pk_badge( 'status_ahli', $ahli['status'] ); ?>
 			<label style="margin-left:1em"><input type="checkbox" name="putus" value="1"> Nyahpaut</label></p>
 			<?php if ( 'meninggal' !== $ahli['status'] ) : ?><p><label><input type="checkbox" name="tanda_meninggal" value="1" checked> Tukar status ahli kepada <b>Meninggal Dunia</b></label></p><?php endif; ?>
 		<?php else : ?>
-			<p><label>Pautkan kepada ahli khairat (pilihan) — No. KP atau No. Ahli<br><input type="text" name="cari_ahli" class="regular-text" placeholder="cth. 480312101234 atau KK-0012"></label><br><span class="description">Boleh dibiarkan kosong untuk tanggungan atau bukan ahli.</span></p>
+			<p><label>Pautkan kepada Ahli Kariah (pilihan) — No. KP atau No. Kariah<br><input type="text" name="cari_ahli" class="regular-text" placeholder="cth. 480312101234 atau KK-0012"></label><br><span class="description">Boleh dibiarkan kosong untuk tanggungan atau bukan ahli.</span></p>
 		<?php endif; ?>
 		<div class="pk-fgrid">
 			<label class="pk-span2">Nama (seperti dipaparkan pada poster) *<input type="text" name="nama" required maxlength="120" value="<?php echo esc_attr( $t['nama'] ); ?>"></label>
@@ -170,7 +170,7 @@ add_action( 'admin_post_pk_tz_save', function () {
 	if ( pk_p( 'putus' ) ) { $ahli_id = 0; }
 	if ( ! $ahli_id && ( $q = pk_p( 'cari_ahli' ) ) ) {
 		$found = 12 === strlen( pk_digits( $q ) ) ? pk_find_ahli_by_kp( $q ) : $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . pk_t( 'ahli' ) . ' WHERE no_ahli=%s LIMIT 1', strtoupper( $q ) ), ARRAY_A );
-		if ( ! $found ) { pk_back( 'Ahli dengan No. KP / No. Ahli tersebut tidak ditemui. Kosongkan medan itu jika bukan ahli.' ); }
+		if ( ! $found ) { pk_back( 'Ahli dengan No. KP / No. Kariah tersebut tidak ditemui. Kosongkan medan itu jika bukan ahli.' ); }
 		$ahli_id = (int) $found['id'];
 	}
 	$ahli = $ahli_id ? pk_get_ahli( $ahli_id ) : null;

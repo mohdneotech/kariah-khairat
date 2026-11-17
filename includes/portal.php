@@ -234,10 +234,10 @@ add_shortcode( 'pk_portal', function () {
 function pk_portal_guest() {
 	$tab = ( $_POST['pk_portal'] ?? '' ) === 'aktif' ? 'aktif' : 'login';
 	$staff_login = wp_login_url( pk_page_url( 'portal' ) );
-	$daftar      = pk_page_url( 'khairat' );
+	$daftar      = pk_page_url( 'kariah' );
 	ob_start(); ?>
 	<div class="pk-portal-guest">
-		<div class="pk-intro"><div><i class="fa-solid fa-id-card"></i></div><div><strong>Portal Ahli Kariah</strong><br>Semak maklumat keahlian khairat, tanggungan, yuran dan resit bayaran anda. Kemas kini maklumat hubungan pada bila-bila masa.</div></div>
+		<div class="pk-intro"><div><i class="fa-solid fa-id-card"></i></div><div><strong>Portal Ahli Kariah</strong><br>Semak maklumat keahlian kariah &amp; khairat, tanggungan, yuran dan resit bayaran anda. Kemas kini maklumat hubungan pada bila-bila masa.</div></div>
 
 		<div class="pk-guest-grid">
 		<div class="pk-guest-steps">
@@ -246,8 +246,8 @@ function pk_portal_guest() {
 			<li class="pk-gstep pk-gstep-first">
 				<span class="pk-gstep-no">1</span>
 				<div class="pk-gstep-body">
-					<strong>Daftar sebagai ahli</strong>
-					<span>Isi borang pendaftaran dalam talian. <b>Wajib</b> sebelum akaun boleh diaktifkan. Sekali sahaja.</span>
+					<strong>Daftar sebagai Ahli Kariah</strong>
+					<span>Isi borang Ahli Kariah dalam talian. <b>Wajib</b> sebelum akaun boleh diaktifkan. Sekali sahaja — anda akan menerima No. Kariah selepas diluluskan. Khairat Kematian didaftar selepas itu.</span>
 					<a class="btn btn-mp btn-sm mt-2" href="<?php echo esc_url( $daftar ); ?>"><i class="fa-solid fa-pen-to-square"></i> Daftar Sekarang</a>
 					<small class="pk-gstep-note">Sudah mendaftar dengan borang kertas di masjid? Terus ke langkah 2.</small>
 				</div>
@@ -293,7 +293,7 @@ function pk_portal_guest() {
 			<div class="tab-pane fade <?php echo 'aktif' === $tab ? 'show active' : ''; ?>" id="pk-aktif">
 				<form method="post" class="pk-card pk-form">
 					<?php echo pk_pf( 'aktif' ); ?>
-					<div class="pk-need-daftar"><i class="fa-solid fa-circle-exclamation"></i><div><strong>Belum mendaftar?</strong> Akaun hanya boleh diaktifkan selepas anda mendaftar sebagai ahli. <a href="<?php echo esc_url( $daftar ); ?>">Daftar dahulu (langkah 1) &rarr;</a></div></div>
+					<div class="pk-need-daftar"><i class="fa-solid fa-circle-exclamation"></i><div><strong>Belum mendaftar?</strong> Akaun hanya boleh diaktifkan selepas anda mendaftar sebagai Ahli Kariah. <a href="<?php echo esc_url( $daftar ); ?>">Daftar dahulu (langkah 1) &rarr;</a></div></div>
 					<p class="small text-secondary">Sudah mendaftar? Masukkan No. KP dan No. Telefon <strong>seperti dalam borang pendaftaran</strong>, kemudian cipta kata laluan.</p>
 					<div class="row g-3">
 						<div class="col-md-6"><label class="form-label">No. Kad Pengenalan *</label><input class="form-control" name="kp" required inputmode="numeric" value="<?php echo 'aktif' === $tab ? esc_attr( pk_p( 'kp' ) ) : ''; ?>"></div>
@@ -330,7 +330,7 @@ function pk_portal_member( array $a ) {
 			<?php echo pk_avatar_html( $a ); ?>
 			<div class="flex-grow-1">
 				<div class="pk-mh-name"><?php echo esc_html( $a['nama'] ); ?></div>
-				<div class="pk-mh-meta">No. Ahli <strong><?php echo esc_html( $a['no_ahli'] ?: 'belum diberikan' ); ?></strong> · <?php echo pk_badge( 'status_ahli', $a['status'] ); ?> · Yuran <?php echo (int) $yr; ?>: <?php echo $paid ? '<span class="pk-badge pk-b-ok">Dijelaskan</span>' : '<span class="pk-badge pk-b-warn">Belum dijelaskan</span>'; ?></div>
+				<div class="pk-mh-meta">No. Kariah <strong><?php echo esc_html( $a['no_ahli'] ?: 'belum diberikan' ); ?></strong> · <?php echo pk_badge( 'status_ahli', $a['status'] ); ?> · Khairat: <?php echo pk_badge( 'status_khairat', $a['khairat'] ); ?><?php if ( in_array( $a['khairat'], [ 'aktif', 'menunggu' ], true ) ) : ?> · Yuran <?php echo (int) $yr; ?>: <?php echo $paid ? '<span class="pk-badge pk-b-ok">Dijelaskan</span>' : '<span class="pk-badge pk-b-warn">Belum dijelaskan</span>'; ?><?php endif; ?></div>
 			</div>
 			<?php if ( current_user_can( PK_CAP ) ) : ?><a class="btn btn-sm btn-light" href="<?php echo esc_url( admin_url( 'admin.php?page=pk-dashboard' ) ); ?>"><i class="fa-solid fa-gauge"></i> Papan Pemuka AJK</a><?php endif; ?>
 			<a class="btn btn-sm btn-outline-light" href="<?php echo esc_url( wp_logout_url( pk_page_url( 'portal' ) ) ); ?>"><i class="fa-solid fa-right-from-bracket"></i> Log keluar</a>
@@ -405,7 +405,7 @@ function pk_portal_member( array $a ) {
 					<summary class="pk-h mb-0"><i class="fa-solid fa-pen-to-square text-mp"></i> Mohon kemas kini pasangan / tanggungan</summary>
 					<form method="post" class="pk-form mt-3" data-pk-form="keluarga">
 						<?php echo pk_pf( 'keluarga' ); ?>
-						<p class="small text-secondary">Perubahan pasangan dan tanggungan memberi kesan kepada perlindungan khairat, oleh itu ia akan <strong>disemak dan diluluskan oleh AJK</strong> terlebih dahulu. Tanggungan terhad kepada suami/isteri, anak belum berkahwin yang tinggal bersama, serta ibu bapa / mertua yang tinggal bersama (tidak termasuk anak 18 tahun ke atas yang bekerja).</p>
+						<p class="small text-secondary">Perubahan pasangan dan tanggungan memberi kesan kepada perlindungan khairat, oleh itu ia akan <strong>disemak dan diluluskan oleh AJK</strong> terlebih dahulu. Perlindungan khairat meliputi suami/isteri, anak tanggungan<?php echo (int) pk_opt( 'had_umur_anak' ) ? ' berumur bawah ' . (int) pk_opt( 'had_umur_anak' ) . ' tahun' : ''; ?>, serta ibu bapa / mertua yang tinggal bersama.</p>
 						<div class="row g-3">
 							<div class="col-12"><label class="form-label">Nama suami / isteri</label><input class="form-control" name="p_nama" value="<?php echo esc_attr( $cur['p_nama'] ?? '' ); ?>"></div>
 							<div class="col-md-6"><label class="form-label">No. KP pasangan</label><input class="form-control" name="p_kp" inputmode="numeric" value="<?php echo esc_attr( $cur['p_kp'] ?? '' ); ?>"></div>
@@ -427,6 +427,7 @@ function pk_portal_member( array $a ) {
 
 			<!-- BAYARAN -->
 			<div class="tab-pane fade" id="bayaran">
+				<?php echo pk_portal_khairat_cta( $a ); ?>
 				<?php echo pk_portal_pelan_block( 'khairat', $a['id'] ); ?>
 			</div>
 
@@ -500,13 +501,29 @@ function pk_portal_pelan_block( $jenis, $ref, $card = true ) {
 	return $h . ( $card ? '</div>' : '' );
 }
 
+/** Khairat status / call-to-action for a logged-in member (Khairat requires an active Ahli Kariah). */
+function pk_portal_khairat_cta( array $a ) {
+	if ( 'lulus' === $a['status'] ) {
+		return '<div class="alert alert-warning"><i class="fa-solid fa-wallet me-1"></i> Pendaftaran Ahli Kariah anda telah diluluskan. Sila jelaskan yuran Ahli Kariah di bawah — No. Kariah diberikan secara automatik selepas bayaran disahkan, dan selepas itu anda boleh mendaftar Khairat Kematian.</div>';
+	}
+	if ( 'menunggu' === $a['status'] ) {
+		return '<div class="alert alert-warning"><i class="fa-solid fa-hourglass-half me-1"></i> Pendaftaran Ahli Kariah anda sedang disemak oleh AJK. Selepas diluluskan dan No. Kariah diberikan, anda boleh mendaftar Khairat Kematian di sini.</div>';
+	}
+	if ( pk_is_kariah_aktif( $a ) && ! in_array( $a['khairat'], [ 'aktif', 'menunggu' ], true ) ) {
+		return '<div class="pk-card d-flex flex-wrap gap-3 align-items-center justify-content-between"><div><strong><i class="fa-solid fa-hand-holding-heart text-mp me-1"></i> Khairat Kematian</strong><br><span class="small text-secondary">Anda Ahli Kariah aktif (' . esc_html( $a['no_ahli'] ) . '). Lindungi diri dan keluarga dengan menyertai Badan Khairat Kematian — '
+			. esc_html( pk_rm( pk_opt( 'yuran_daftar' ) ) ) . ' pendaftaran + ' . esc_html( pk_rm( pk_opt( 'yuran_tahunan' ) ) ) . ' setahun.</span></div>'
+			. '<a class="btn btn-mp" href="' . esc_url( pk_page_url( 'khairat' ) ) . '"><i class="fa-solid fa-pen-to-square"></i> Daftar Khairat</a></div>';
+	}
+	return '';
+}
+
 /** Logged in (e.g. AJK/admin) but no member record linked yet: link an existing record, or register as a new member. */
 function pk_portal_unlinked() {
 	$u = wp_get_current_user();
 	$staff = pk_is_staff( $u );
 	ob_start(); ?>
 	<div class="pk-portal-guest">
-		<div class="pk-intro"><div><i class="fa-solid fa-user-plus"></i></div><div><strong>Assalamualaikum, <?php echo esc_html( $u->display_name ); ?></strong><br><?php echo $staff ? 'Anda log masuk sebagai AJK/pentadbir. Jika anda juga ahli kariah, pautkan rekod keahlian anda atau daftar sebagai ahli baharu — kemudian urus maklumat anda sendiri di sini.' : 'Akaun anda belum dipautkan kepada rekod ahli.'; ?></div></div>
+		<div class="pk-intro"><div><i class="fa-solid fa-user-plus"></i></div><div><strong>Assalamualaikum, <?php echo esc_html( $u->display_name ); ?></strong><br><?php echo $staff ? 'Anda log masuk sebagai AJK/pentadbir. Jika anda juga ahli kariah, pautkan rekod keahlian anda atau daftar sebagai Ahli Kariah — kemudian urus maklumat anda sendiri di sini.' : 'Akaun anda belum dipautkan kepada rekod ahli.'; ?></div></div>
 		<form method="post" class="pk-card pk-form">
 			<?php echo pk_pf( 'pautkan' ); ?>
 			<h3 class="pk-h"><i class="fa-solid fa-link text-mp"></i> Saya sudah berdaftar — pautkan rekod saya</h3>
@@ -519,8 +536,8 @@ function pk_portal_unlinked() {
 		</form>
 		<div class="pk-card text-center">
 			<h3 class="pk-h justify-content-center"><i class="fa-solid fa-user-plus text-mp"></i> Belum berdaftar?</h3>
-			<p class="small text-secondary">Isi borang pendaftaran khairat semasa log masuk. Rekod baharu akan dipautkan terus kepada akaun anda dan disemak oleh AJK.</p>
-			<a class="btn btn-leaf" href="<?php echo esc_url( pk_page_url( 'khairat' ) ); ?>"><i class="fa-solid fa-pen-to-square"></i> Daftar Sebagai Ahli</a>
+			<p class="small text-secondary">Isi borang Ahli Kariah semasa log masuk. Rekod baharu akan dipautkan terus kepada akaun anda dan disemak oleh AJK. Selepas menerima No. Kariah, daftar Khairat Kematian dari portal ini.</p>
+			<a class="btn btn-leaf" href="<?php echo esc_url( pk_page_url( 'kariah' ) ); ?>"><i class="fa-solid fa-pen-to-square"></i> Daftar Ahli Kariah</a>
 		</div>
 		<p class="text-center small"><?php if ( current_user_can( PK_CAP ) ) : ?><a href="<?php echo esc_url( admin_url( 'admin.php?page=pk-dashboard' ) ); ?>">Papan Pemuka AJK</a> · <?php endif; ?><a href="<?php echo esc_url( wp_logout_url( pk_page_url( 'portal' ) ) ); ?>">Log keluar</a></p>
 	</div>

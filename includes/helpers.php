@@ -10,8 +10,10 @@ function pk_default_settings() {
 		'nama_masjid'      => get_bloginfo( 'name' ),
 		'alamat_masjid'    => '',
 		// fees
+		'yuran_kariah'     => 0,
 		'yuran_daftar'     => 30,
 		'yuran_tahunan'    => 36,
+		'had_umur_anak'    => 18,   // anak pada/melebihi umur ini perlu daftar sendiri (0 = tiada had)
 		'harga_bahagian'   => 950,
 		'musim_korban'     => pk_hijri_year( $y ) . 'H',
 		'tahun_korban_m'   => (string) $y,
@@ -23,17 +25,19 @@ function pk_default_settings() {
 		'label_qr'         => 'DuitNow QR',
 		// workflow
 		'emel_notis'       => get_option( 'admin_email' ),
+		'buka_kariah'      => 1,
 		'buka_khairat'     => 1,
 		'buka_korban'      => 1,
 		'kawasan'          => '',
 		'nota_khairat'     => 'Resit rasmi boleh diambil di pejabat masjid selepas bayaran disahkan. Sila maklumkan AJK jika ada bayaran tunggakan tahun sebelum.',
 		'nota_korban'      => 'Sembelihan akan diadakan selepas solat sunat Aidiladha. Satu ekor lembu = 7 bahagian.',
 		'terma_khairat'    => implode( "\n", [
-			'Keahlian terbuka kepada ahli kariah {masjid} seperti yang ditetapkan oleh peraturan masjid dan pihak berkuasa agama negeri.',
+			'Keahlian terbuka kepada Ahli Kariah {masjid} yang aktif (mempunyai No. Kariah) seperti yang ditetapkan oleh peraturan masjid dan pihak berkuasa agama negeri.',
 			'Ahli/Pencarum diwajibkan menjelaskan Yuran Keahlian {yuran_daftar} (sekali bayaran sahaja) dan Yuran Tahunan {yuran_tahunan} (setiap tahun).',
 			'Yuran pembaharuan sebanyak {yuran_tahunan} perlu dijelaskan sebaik sahaja berakhir 31 Disember setiap tahun.',
 			'Keahlian akan terbatal sekiranya yuran tahunan gagal dijelaskan dalam tempoh setahun tanpa alasan munasabah, dan pendaftaran baharu perlu dikemukakan semula.',
-			'Tanggungan terhad kepada suami, isteri, anak-anak yang belum berkahwin dan tinggal bersama, serta ibu bapa dan ibu bapa mertua yang tinggal bersama sahaja, tidak termasuk anak berusia 18 tahun ke atas yang sudah bekerja.',
+			'Yuran khairat dibayar oleh ketua keluarga dan meliputi suami/isteri, anak berumur bawah {had_umur_anak} tahun, serta ibu bapa dan ibu bapa mertua yang tinggal bersama.',
+			'Anak berumur {had_umur_anak} tahun ke atas perlu mendaftar sendiri sebagai Ahli Kariah dan ahli Khairat Kematian.',
 			'Ahli bertanggungjawab mengemas kini maklumat kerana hanya maklumat dalam rekod Badan Khairat Kematian dianggap sah.',
 			'Permohonan dianggap tidak lengkap jika maklumat yang diperlukan tidak diisi dengan lengkap. Terma dan syarat tertakluk kepada pindaan dari masa ke semasa.',
 		] ),
@@ -61,6 +65,8 @@ function pk_fill( $text ) {
 		'{masjid}'         => pk_nama(),
 		'{yuran_daftar}'   => pk_rm( pk_opt( 'yuran_daftar' ) ),
 		'{yuran_tahunan}'  => pk_rm( pk_opt( 'yuran_tahunan' ) ),
+		'{yuran_kariah}'   => pk_rm( pk_opt( 'yuran_kariah' ) ),
+		'{had_umur_anak}'  => (string) (int) pk_opt( 'had_umur_anak' ),
 		'{harga_bahagian}' => pk_rm( pk_opt( 'harga_bahagian' ) ),
 	] );
 }
@@ -88,13 +94,14 @@ function pk_label( $group, $key = null ) {
 /** All option lists. Filter 'pk_labels' to rename or add options (e.g. extra relationships or payment methods). */
 function pk_labels() {
 	$L = [
-		'status_ahli'   => [ 'menunggu' => 'Menunggu Pengesahan', 'aktif' => 'Aktif', 'tidak_aktif' => 'Tidak Aktif / Luput', 'meninggal' => 'Meninggal Dunia', 'ditolak' => 'Ditolak' ],
+		'status_ahli'   => [ 'menunggu' => 'Menunggu Pengesahan', 'lulus' => 'Diluluskan — Menunggu Bayaran', 'aktif' => 'Aktif', 'tidak_aktif' => 'Tidak Aktif / Luput', 'meninggal' => 'Meninggal Dunia', 'ditolak' => 'Ditolak' ],
+		'status_khairat' => [ '' => 'Belum Menyertai', 'menunggu' => 'Menunggu Pengesahan', 'aktif' => 'Aktif', 'tidak_aktif' => 'Tidak Aktif / Luput', 'ditolak' => 'Ditolak' ],
 		'status_korban' => [ 'menunggu' => 'Menunggu Pengesahan', 'disahkan' => 'Disahkan', 'selesai' => 'Selesai', 'batal' => 'Batal' ],
 		'status_bayar'  => [ 'menunggu' => 'Menunggu Semakan', 'sah' => 'Disahkan', 'ditolak' => 'Ditolak' ],
 		'status_pelan'  => [ 'aktif' => 'Belum Selesai', 'selesai' => 'Selesai', 'batal' => 'Batal' ],
 		'mod'           => [ 'sekaligus' => 'Sekaligus (one-off)', 'ansuran' => 'Ansuran / Menabung' ],
 		'kaedah'        => [ 'qr' => 'QR', 'transfer' => 'Pindahan Bank', 'tunai' => 'Tunai', 'lain' => 'Lain-lain' ],
-		'kategori'      => [ 'daftar' => 'Pendaftaran + Tahunan', 'tahunan' => 'Yuran Tahunan', 'tunggakan' => 'Tunggakan', 'korban' => 'Korban', 'aqiqah' => 'Aqiqah', 'lain' => 'Lain-lain' ],
+		'kategori'      => [ 'kariah' => 'Yuran Ahli Kariah', 'daftar' => 'Pendaftaran + Tahunan', 'tahunan' => 'Yuran Tahunan', 'tunggakan' => 'Tunggakan', 'korban' => 'Korban', 'aqiqah' => 'Aqiqah', 'lain' => 'Lain-lain' ],
 		'sektor'        => [ 'Kerajaan' => 'Kerajaan', 'Swasta' => 'Swasta', 'Sendiri' => 'Bekerja Sendiri', 'Pesara' => 'Pesara', 'Tidak Bekerja' => 'Tidak Bekerja / Suri Rumah', 'Pelajar' => 'Pelajar', 'Lain-lain' => 'Lain-lain' ],
 		'hubungan'      => [ 'Suami' => 'Suami', 'Isteri' => 'Isteri', 'Anak' => 'Anak', 'Bapa' => 'Bapa', 'Ibu' => 'Ibu', 'Bapa Mertua' => 'Bapa Mertua', 'Ibu Mertua' => 'Ibu Mertua', 'Lain-lain' => 'Lain-lain' ],
 		'status_t'      => [ '' => '—', 'S' => 'Sekolah', 'K' => 'Kerja', 'P' => 'Pencen', 'T' => 'Tidak Bekerja / Bawah Umur' ],
@@ -113,13 +120,24 @@ function pk_labels() {
 }
 
 function pk_badge( $group, $key ) {
-	$map = [ 'menunggu' => 'warn', 'aktif' => 'ok', 'sah' => 'ok', 'selesai' => 'ok', 'disahkan' => 'ok', 'tidak_aktif' => 'mute', 'batal' => 'mute', 'meninggal' => 'mute', 'ditolak' => 'bad' ];
+	$map = [ 'menunggu' => 'warn', 'lulus' => 'warn', 'aktif' => 'ok', 'sah' => 'ok', 'selesai' => 'ok', 'disahkan' => 'ok', 'tidak_aktif' => 'mute', 'batal' => 'mute', 'meninggal' => 'mute', 'ditolak' => 'bad' ];
 	$c   = $map[ $key ] ?? 'mute';
+	if ( 'status_khairat' === $group && '' === (string) $key ) { $c = 'none'; }
 	if ( 'status_pelan' === $group && 'aktif' === $key ) { $c = 'warn'; }
 	return '<span class="pk-badge pk-b-' . $c . '">' . esc_html( pk_label( $group, $key ) ) . '</span>';
 }
 
 /* ------------------------------------------------------------------ formatting */
+
+/** Is this dependant still covered by the head of family's khairat? Children aged 18+ must register themselves. */
+function pk_tg_dilindungi( $t ) {
+	if ( 'Anak' !== ( $t['hubungan'] ?? '' ) || empty( $t['tarikh_lahir'] ) ) { return true; }
+	$age = pk_age( $t['tarikh_lahir'] );
+	$had = (int) pk_opt( 'had_umur_anak' );
+	return ! $had || null === $age || $age < $had;
+}
+/** SQL condition (alias t) matching dependants covered by khairat. */
+function pk_tg_dilindungi_sql() { $had = (int) pk_opt( 'had_umur_anak' ); return $had ? "NOT (t.hubungan='Anak' AND t.tarikh_lahir IS NOT NULL AND t.tarikh_lahir <= DATE_SUB(CURDATE(), INTERVAL $had YEAR))" : '1=1'; }
 
 function pk_rm( $n ) { return 'RM ' . number_format( (float) $n, 2 ); }
 function pk_date( $d ) { return $d && '0000-00-00' !== $d ? date_i18n( 'j M Y', strtotime( $d ) ) : '—'; }

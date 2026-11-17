@@ -43,6 +43,7 @@ function pk_enqueue_public() {
 	wp_enqueue_style( 'pk-public' );
 	wp_enqueue_script( 'pk-public' );
 	wp_localize_script( 'pk-public', 'PK', [
+		'kariah'  => (float) pk_opt( 'yuran_kariah' ),
 		'daftar'  => (float) pk_opt( 'yuran_daftar' ),
 		'tahunan' => (float) pk_opt( 'yuran_tahunan' ),
 		'harga'   => (float) pk_opt( 'harga_bahagian' ),
@@ -57,19 +58,19 @@ function pk_maybe_fa() {
 	if ( 'cdn' === $fa || ( 'auto' === $fa && ! pk_theme_has_fa() ) ) { wp_enqueue_style( 'pk-fontawesome' ); }
 }
 
-function pk_ref( $type, $id ) { return ( 'khairat' === $type ? 'KHR-' : 'KRB-' ) . str_pad( (string) $id, 5, '0', STR_PAD_LEFT ); }
+function pk_ref( $type, $id ) { return ( [ 'kariah' => 'KRH-', 'khairat' => 'KHR-' ][ $type ] ?? 'KRB-' ) . str_pad( (string) $id, 5, '0', STR_PAD_LEFT ); }
 
 /* ================================================================= POST handling (PRG) */
 
 add_action( 'template_redirect', function () {
 	if ( 'POST' !== ( $_SERVER['REQUEST_METHOD'] ?? '' ) || empty( $_POST['pk_action'] ) ) { return; }
 	$act = is_string( $_POST['pk_action'] ) ? sanitize_key( $_POST['pk_action'] ) : '';
-	if ( ! in_array( $act, [ 'khairat', 'korban', 'bayar' ], true ) ) { return; }
+	if ( ! in_array( $act, [ 'kariah', 'khairat', 'korban', 'bayar' ], true ) ) { return; }
 
 	$err = &$GLOBALS['pk_errors'];
 	if ( ! wp_verify_nonce( $_POST['pk_nonce'] ?? '', 'pk_' . $act ) ) { $err[] = 'Sesi borang telah tamat. Sila muat semula halaman dan cuba lagi.'; return; }
 	if ( ! empty( $_POST['pk_web'] ) ) { $err[] = 'Penghantaran ditolak.'; return; } // honeypot
-	if ( in_array( $act, [ 'khairat', 'korban' ], true ) && ( time() - (int) ( $_POST['pk_ts'] ?? 0 ) ) < 8 ) { $err[] = 'Borang dihantar terlalu cepat. Sila semak maklumat dan hantar semula.'; return; }
+	if ( in_array( $act, [ 'kariah', 'khairat', 'korban' ], true ) && ( time() - (int) ( $_POST['pk_ts'] ?? 0 ) ) < 8 ) { $err[] = 'Borang dihantar terlalu cepat. Sila semak maklumat dan hantar semula.'; return; }
 	if ( ! pk_throttle( 'submit', 12, HOUR_IN_SECONDS ) ) { $err[] = 'Terlalu banyak penghantaran dari rangkaian anda. Sila cuba sebentar lagi.'; return; }
 
 	$fn  = 'pk_handle_' . $act;
@@ -88,10 +89,10 @@ function pk_payment_from_post( $total ) {
 	return compact( 'cara', 'bil', 'kaedah', 'bayar' );
 }
 
-/* ---------------------------------------------------------------- khairat */
+/* ---------------------------------------------------------------- ahli kariah (once, lifetime) */
 
-function pk_handle_khairat() {
-	if ( ! pk_opt( 'buka_khairat' ) ) { return new WP_Error( 'x', 'Pendaftaran dalam talian ditutup buat masa ini.' ); }
+function pk_handle_kariah() {
+	if ( ! pk_opt( 'buka_kariah' ) ) { return new WP_Error( 'x', 'Pendaftaran Ahli Kariah dalam talian ditutup buat masa ini.' ); }
 	$e    = new WP_Error();
 	$nama = pk_p( 'nama', '', 150 ); $kp = pk_digits( pk_p( 'no_kp', '', 20 ) ); $hp = pk_p( 'no_hp', '', 20 ); $alamat = pk_pt( 'alamat', 500 );
 	if ( mb_strlen( $nama ) < 3 ) { $e->add( 'x', 'Sila isi Nama Penuh.' ); }
@@ -99,56 +100,100 @@ function pk_handle_khairat() {
 	if ( strlen( pk_digits( $hp ) ) < 9 ) { $e->add( 'x', 'Sila isi No. Telefon bimbit yang sah.' ); }
 	if ( mb_strlen( $alamat ) < 8 ) { $e->add( 'x', 'Sila isi Alamat Rumah.' ); }
 	if ( empty( $_POST['perakuan'] ) ) { $e->add( 'x', 'Sila tandakan perakuan bersetuju dengan terma dan syarat.' ); }
-	$email = sanitize_email( pk_p( 'email' ) );
+	$exist = pk_find_ahli_by_kp( $kp );
+	if ( $exist && 'ditolak' !== $exist['status'] ) {
+		$e->add( 'x', 'No. Kad Pengenalan ini telah didaftarkan sebagai Ahli Kariah. Semak status anda di halaman Semak Status (No. KP + No. Telefon), atau hubungi AJK.' );
+	}
+	$fee = (float) pk_opt( 'yuran_kariah' );
+	$pay = $fee > 0 ? pk_payment_from_post( $fee ) : null;
+	if ( $pay && $pay['bayar'] > 0 && 'tunai' !== $pay['kaedah'] && empty( $_FILES['bukti']['tmp_name'] ) ) {
+		$e->add( 'x', 'Sila muat naik bukti pembayaran, atau set "Jumlah dibayar sekarang" kepada 0 jika belum membuat bayaran.' );
+	}
+	if ( $e->has_errors() ) { return $e; }
+	$bukti = $pay ? pk_store_upload( 'bukti' ) : '';
+	if ( is_wp_error( $bukti ) ) { return $bukti; }
 
-	$yr     = pk_year();
-	$jenis  = pk_p( 'jenis_mohon' ) === 'baharui' ? 'baharui' : 'baru';
+	$id = pk_save_ahli_data( [
+		'nama' => $nama, 'no_kp' => $kp, 'no_hp' => $hp, 'email' => sanitize_email( pk_p( 'email' ) ), 'alamat' => $alamat, 'kawasan' => pk_p( 'kawasan' ),
+		'pekerjaan' => pk_p( 'pekerjaan' ), 'sektor' => pk_p( 'sektor' ), 'majikan' => pk_p( 'majikan' ), 'tel_p' => pk_p( 'tel_p' ), 'tel_r' => pk_p( 'tel_r' ),
+		'p_nama' => pk_p( 'p_nama' ), 'p_kp' => pk_p( 'p_kp' ), 'p_hp' => pk_p( 'p_hp' ), 'p_pekerjaan' => pk_p( 'p_pekerjaan' ), 'p_sektor' => pk_p( 'p_sektor' ), 'p_majikan' => pk_p( 'p_majikan' ), 'p_tel_p' => pk_p( 'p_tel_p' ),
+		'status' => 'menunggu', 'sumber' => 'online', 'khairat' => '', 'catatan' => '',
+	] );
+	pk_tanggungan_replace( $id, pk_tanggungan_from_post() );
+	pk_log( $id, 'daftar', 'Pendaftaran Ahli Kariah dalam talian' );
+	// logged-in user (e.g. AJK/admin registering themselves) without a linked record: link it to their account
+	if ( is_user_logged_in() && ! pk_ahli_for_user() ) {
+		global $wpdb;
+		$wpdb->update( pk_t( 'ahli' ), [ 'user_id' => get_current_user_id() ], [ 'id' => $id ] );
+		pk_log( $id, 'akaun_pautkan', 'Didaftarkan sendiri oleh pengguna ' . wp_get_current_user()->user_login );
+	}
+	if ( $pay ) {
+		$pid = pk_pelan_create( [ 'jenis' => 'khairat', 'ref_id' => $id, 'kategori' => 'kariah', 'tajuk' => 'Yuran Pendaftaran Ahli Kariah', 'jumlah' => $fee, 'cara' => $pay['cara'], 'bil_ansuran' => $pay['bil'] ] );
+		if ( $pay['bayar'] > 0 ) {
+			pk_bayaran_create( [ 'pelan_id' => $pid, 'jumlah' => $pay['bayar'], 'kaedah' => $pay['kaedah'], 'bukti' => (string) $bukti, 'status' => 'menunggu', 'sumber' => 'online' ] );
+		}
+	}
+	pk_notify( 'Pendaftaran Ahli Kariah baharu: ' . mb_strtoupper( $nama ), "Nama: $nama\nNo. HP: $hp\nKawasan: " . pk_p( 'kawasan' ) . "\n\nSemak & luluskan: " . admin_url( 'admin.php?page=pk-ahli&action=edit&id=' . $id ), 'khairat' );
+	return pk_ref( 'kariah', $id );
+}
+
+/* ---------------------------------------------------------------- khairat (yearly, Ahli Kariah only) */
+
+/** The kariah record a khairat application is for: the logged-in member's own record, or No. Kariah + No. KP. */
+function pk_khairat_applicant() {
+	$me = is_user_logged_in() ? pk_ahli_for_user() : null;
+	if ( $me ) {
+		if ( pk_is_kariah_aktif( $me ) ) { return $me; }
+		return new WP_Error( 'x', 'menunggu' === $me['status']
+			? 'Pendaftaran Ahli Kariah anda masih menunggu kelulusan AJK. Pendaftaran Khairat Kematian boleh dibuat selepas anda menerima No. Kariah.'
+			: ( 'lulus' === $me['status'] ? 'Pendaftaran Ahli Kariah anda telah diluluskan. Sila jelaskan yuran Ahli Kariah — No. Kariah diberikan selepas bayaran disahkan.' : 'Keahlian kariah anda tidak aktif (' . pk_label( 'status_ahli', $me['status'] ) . '). Sila hubungi AJK.' ) );
+	}
+	$a = pk_find_kariah( pk_p( 'no_kariah', '', 20 ), pk_p( 'no_kp', '', 20 ) );
+	if ( ! $a ) {
+		return new WP_Error( 'x', 'No. Kariah dan No. Kad Pengenalan tidak sepadan dengan mana-mana Ahli Kariah. Anda perlu mendaftar sebagai Ahli Kariah dahulu dan menerima No. Kariah (selepas diluluskan AJK) sebelum boleh mendaftar Khairat Kematian.' );
+	}
+	if ( ! pk_is_kariah_aktif( $a ) ) { return new WP_Error( 'x', 'Keahlian kariah ini tidak aktif (' . pk_label( 'status_ahli', $a['status'] ) . '). Sila hubungi AJK.' ); }
+	return $a;
+}
+
+function pk_handle_khairat() {
+	if ( ! pk_opt( 'buka_khairat' ) ) { return new WP_Error( 'x', 'Pendaftaran dalam talian ditutup buat masa ini.' ); }
+	$a = pk_khairat_applicant();
+	if ( is_wp_error( $a ) ) { return $a; }
+	$e  = new WP_Error();
+	$id = (int) $a['id'];
+	$yr      = pk_year();
+	$jenis   = pk_p( 'jenis_mohon' ) === 'baharui' ? 'baharui' : 'baru';
 	$tunggak = array_values( array_unique( array_filter( array_map( 'intval', array_filter( (array) ( $_POST['tunggakan'] ?? [] ), 'is_scalar' ) ), fn( $y ) => $y >= $yr - 5 && $y < $yr ) ) );
 	if ( 'baru' === $jenis ) { $tunggak = []; }
+	if ( 'baru' === $jenis && in_array( $a['khairat'], [ 'aktif', 'menunggu' ], true ) ) {
+		$e->add( 'x', 'aktif' === $a['khairat'] ? 'Anda sudah menjadi ahli Khairat Kematian. Sila pilih "Pembaharuan Yuran Tahunan".' : 'Pendaftaran Khairat Kematian anda sedang menunggu pengesahan AJK. Semak status atau hantar bayaran di halaman Semak Status.' );
+	}
+	if ( 'baharui' === $jenis && 'aktif' !== $a['khairat'] ) {
+		$e->add( 'x', 'Pembaharuan hanya untuk ahli Khairat Kematian yang aktif. Sila pilih "Ahli Khairat Baharu". Jika anda ahli khairat lama yang belum direkodkan dalam sistem, sila hubungi AJK.' );
+	}
+	if ( 'baharui' === $jenis && pk_ahli_paid_year( $id, $yr ) && ! $tunggak ) {
+		$e->add( 'x', "Yuran tahunan $yr anda telah dijelaskan." );
+	}
+	if ( empty( $_POST['perakuan'] ) ) { $e->add( 'x', 'Sila tandakan perakuan bersetuju dengan terma dan syarat.' ); }
 	$total = ( 'baru' === $jenis ? (float) pk_opt( 'yuran_daftar' ) : 0 ) + (float) pk_opt( 'yuran_tahunan' ) * ( 1 + count( $tunggak ) );
 	$pay   = pk_payment_from_post( $total );
-
-	$exist = pk_find_ahli_by_kp( $kp );
-	if ( $exist && 'baru' === $jenis && in_array( $exist['status'], [ 'aktif', 'menunggu' ], true ) ) {
-		$e->add( 'x', 'Permohonan tidak dapat diproses kerana rekod dengan No. Kad Pengenalan ini sudah wujud. Sila pilih "Pembaharuan Yuran Tahunan", semak di halaman Semak Status & Bayar Ansuran, atau hubungi AJK.' );
-	}
 	if ( $pay['bayar'] > 0 && 'tunai' !== $pay['kaedah'] && empty( $_FILES['bukti']['tmp_name'] ) ) {
 		$e->add( 'x', 'Sila muat naik bukti pembayaran (resit / tangkap layar), atau set "Jumlah dibayar sekarang" kepada 0 jika belum membuat bayaran.' );
 	}
 	if ( $e->has_errors() ) { return $e; }
-
 	$bukti = pk_store_upload( 'bukti' );
 	if ( is_wp_error( $bukti ) ) { return $bukti; }
 
-	$data = [
-		'nama' => $nama, 'no_kp' => $kp, 'no_hp' => $hp, 'email' => $email, 'alamat' => $alamat, 'kawasan' => pk_p( 'kawasan' ),
-		'pekerjaan' => pk_p( 'pekerjaan' ), 'sektor' => pk_p( 'sektor' ), 'majikan' => pk_p( 'majikan' ), 'tel_p' => pk_p( 'tel_p' ), 'tel_r' => pk_p( 'tel_r' ),
-		'p_nama' => pk_p( 'p_nama' ), 'p_kp' => pk_p( 'p_kp' ), 'p_hp' => pk_p( 'p_hp' ), 'p_pekerjaan' => pk_p( 'p_pekerjaan' ), 'p_sektor' => pk_p( 'p_sektor' ), 'p_majikan' => pk_p( 'p_majikan' ), 'p_tel_p' => pk_p( 'p_tel_p' ),
-	];
-
-	if ( $exist && 'baharui' === $jenis ) {
-		$id = (int) $exist['id'];
-		global $wpdb;
-		$note = trim( ( $exist['catatan'] ?? '' ) . "\n[" . pk_now() . '] Pembaharuan dalam talian. Maklumat dihantar: HP ' . $hp . ', alamat: ' . preg_replace( '/\s+/', ' ', $alamat ) );
-		$wpdb->update( pk_t( 'ahli' ), [ 'catatan' => $note, 'updated_at' => pk_now() ], [ 'id' => $id ] );
+	if ( 'baru' === $jenis ) {
+		pk_save_ahli_data( [ 'khairat' => 'menunggu' ], $id );
+		pk_log( $id, 'khairat_daftar', 'Pendaftaran Khairat Kematian dalam talian' );
 	} else {
-		$data['status']  = 'menunggu';
-		$data['sumber']  = 'online';
-		$data['catatan'] = 'baharui' === $jenis ? 'Memohon sebagai ahli sedia ada (pembaharuan) — sila semak rekod lama.' : '';
-		$id = pk_save_ahli_data( $data );
-		pk_tanggungan_replace( $id, pk_tanggungan_from_post() );
-		pk_log( $id, 'daftar', 'Pendaftaran dalam talian' );
-		// logged-in user (e.g. AJK/admin registering themselves) without a linked record: link it to their account
-		if ( is_user_logged_in() && ! pk_ahli_for_user() ) {
-			global $wpdb;
-			$wpdb->update( pk_t( 'ahli' ), [ 'user_id' => get_current_user_id() ], [ 'id' => $id ] );
-			pk_log( $id, 'akaun_pautkan', 'Didaftarkan sendiri oleh pengguna ' . wp_get_current_user()->user_login );
-		}
+		pk_log( $id, 'khairat_baharui', 'Pembaharuan yuran khairat dalam talian' . ( $tunggak ? ' (termasuk tunggakan ' . implode( ', ', $tunggak ) . ')' : '' ) );
 	}
-
 	$liputan = array_merge( $tunggak, [ $yr ] );
 	sort( $liputan );
-	$tajuk = ( 'baru' === $jenis ? 'Pendaftaran + Yuran Tahunan ' : 'Yuran Tahunan ' ) . implode( ', ', $liputan );
+	$tajuk = ( 'baru' === $jenis ? 'Pendaftaran Khairat + Yuran Tahunan ' : 'Yuran Tahunan Khairat ' ) . implode( ', ', $liputan );
 	$pid   = pk_pelan_create( [
 		'jenis' => 'khairat', 'ref_id' => $id, 'kategori' => 'baru' === $jenis ? 'daftar' : ( $tunggak ? 'tunggakan' : 'tahunan' ),
 		'liputan' => $liputan, 'tajuk' => $tajuk, 'jumlah' => $total, 'cara' => $pay['cara'], 'bil_ansuran' => $pay['bil'],
@@ -156,7 +201,7 @@ function pk_handle_khairat() {
 	if ( $pay['bayar'] > 0 ) {
 		pk_bayaran_create( [ 'pelan_id' => $pid, 'jumlah' => $pay['bayar'], 'kaedah' => $pay['kaedah'], 'bukti' => (string) $bukti, 'status' => 'menunggu', 'sumber' => 'online' ] );
 	}
-	pk_notify( 'Pendaftaran khairat baharu: ' . mb_strtoupper( $nama ), "Nama: $nama\nNo. HP: $hp\nJumlah: " . pk_rm( $total ) . ' (' . pk_label( 'mod', $pay['cara'] ) . ")\nDibayar sekarang: " . pk_rm( $pay['bayar'] ) . "\n\nSemak: " . admin_url( 'admin.php?page=pk-ahli&action=edit&id=' . $id ) );
+	pk_notify( ( 'baru' === $jenis ? 'Pendaftaran khairat baharu: ' : 'Pembaharuan khairat: ' ) . $a['nama'] . ' (' . $a['no_ahli'] . ')', 'No. Kariah: ' . $a['no_ahli'] . "\nNama: " . $a['nama'] . "\nJumlah: " . pk_rm( $total ) . ' (' . pk_label( 'mod', $pay['cara'] ) . ")\nDibayar sekarang: " . pk_rm( $pay['bayar'] ) . "\n\nSemak: " . admin_url( 'admin.php?page=pk-ahli&action=edit&id=' . $id ), 'khairat' );
 	return pk_ref( 'khairat', $id );
 }
 
@@ -257,13 +302,14 @@ function pk_render_errors() {
 
 function pk_render_success( $type ) {
 	if ( ( $_GET['pk_ok'] ?? '' ) !== $type ) { return ''; }
-	$ref = is_string( $_GET['ref'] ?? null ) && preg_match( '/^(KHR|KRB|BYR)-\d{1,9}$/', $_GET['ref'] ) ? $_GET['ref'] : '';
+	$ref = is_string( $_GET['ref'] ?? null ) && preg_match( '/^(KRH|KHR|KRB|BYR)-\d{1,9}$/', $_GET['ref'] ) ? $_GET['ref'] : '';
 	$msg = [
-		'khairat' => 'Pendaftaran Khairat Kematian anda telah diterima. AJK akan menyemak permohonan dan bayaran anda. No. Ahli akan diberikan selepas permohonan diluluskan.',
+		'kariah'  => 'Pendaftaran Ahli Kariah anda telah diterima. AJK akan menyemak permohonan anda. No. Kariah akan diberikan secara automatik selepas pendaftaran diluluskan dan yuran Ahli Kariah disahkan. Selepas itu anda boleh mendaftar Khairat Kematian menggunakan No. Kariah tersebut.',
+		'khairat' => 'Permohonan Khairat Kematian anda telah diterima. AJK akan menyemak bayaran anda; keahlian khairat diaktifkan selepas bayaran pertama disahkan.',
 		'korban'  => 'Pendaftaran Korban/Aqiqah anda telah diterima. AJK akan menghubungi anda untuk pengesahan.',
 		'bayar'   => 'Bukti bayaran anda telah dihantar dan akan disemak oleh Bendahari / AJK.',
 	][ $type ];
-	if ( 'khairat' === $type ) { $msg .= ' Selepas diluluskan, anda boleh mengaktifkan akaun Portal Ahli untuk menyemak rekod dan mengemas kini maklumat.'; }
+	if ( in_array( $type, [ 'kariah', 'khairat' ], true ) ) { $msg .= ' Selepas diluluskan, anda boleh mengaktifkan akaun Portal Ahli untuk menyemak rekod dan mengemas kini maklumat.'; }
 	return '<div class="alert alert-success pk-alert" id="pk-top"><h5 class="alert-heading mb-1"><i class="fa-solid fa-circle-check me-1"></i> Terima kasih!</h5><p class="mb-1">' . esc_html( $msg ) . '</p>'
 		. ( $ref ? '<p class="mb-0">No. rujukan: <strong>' . esc_html( $ref ) . '</strong>. Anda boleh menyemak status dan menghantar bayaran ansuran seterusnya melalui halaman <a href="' . esc_url( pk_page_url( 'semak' ) ) . '">Semak Status &amp; Bayar Ansuran</a>.</p>' : '' )
 		. '<p class="small text-secondary mt-2 mb-0">' . esc_html( pk_opt( 'nota_khairat' ) ) . '</p></div>';
@@ -272,6 +318,7 @@ function pk_render_success( $type ) {
 /** Shortcode behind each logical page (used for the fallback lookup and the setup screen). */
 function pk_page_map() {
 	return [
+		'kariah'     => [ 'pk_borang_kariah', 'Daftar Ahli Kariah' ],
 		'khairat'    => [ 'pk_borang_khairat', 'Daftar Khairat Kematian' ],
 		'korban'     => [ 'pk_borang_korban', 'Daftar Korban & Aqiqah' ],
 		'semak'      => [ 'pk_semak', 'Semak Status & Bayar Ansuran' ],
@@ -379,42 +426,27 @@ function pk_payment_block( $total_label ) {
 	return ob_get_clean();
 }
 
-/* ================================================================= [pk_borang_khairat] */
+/* ================================================================= [pk_borang_kariah] — langkah 1: Ahli Kariah */
 
-add_shortcode( 'pk_borang_khairat', function () {
+add_shortcode( 'pk_borang_kariah', function () {
 	pk_enqueue_public();
-	if ( $ok = pk_render_success( 'khairat' ) ) { return $ok; }
-	if ( ! pk_opt( 'buka_khairat' ) ) { return '<div class="pk-note">Pendaftaran dalam talian ditutup buat masa ini. Sila hubungi pejabat masjid.</div>'; }
-	$yr = pk_year();
+	if ( $ok = pk_render_success( 'kariah' ) ) { return $ok; }
+	if ( ! pk_opt( 'buka_kariah' ) ) { return '<div class="mp-note">Pendaftaran Ahli Kariah dalam talian ditutup buat masa ini. Sila hubungi pejabat masjid.</div>'; }
 	$kaw = array_filter( array_map( 'trim', explode( "\n", (string) pk_opt( 'kawasan' ) ) ) );
-	$tg = isset( $_POST['tg'] ) ? pk_tanggungan_from_post() : array_fill( 0, 3, [] );
+	$tg  = isset( $_POST['tg'] ) ? pk_tanggungan_from_post() : array_fill( 0, 3, [] );
+	$fee = (float) pk_opt( 'yuran_kariah' );
 	ob_start(); ?>
-	<form class="pk-form" id="pk-top" method="post" enctype="multipart/form-data" data-pk-form="khairat">
-		<?php echo pk_render_errors(); echo pk_common_fields( 'khairat' ); ?>
+	<form class="pk-form" id="pk-top" method="post" enctype="multipart/form-data" data-pk-form="kariah">
+		<?php echo pk_render_errors(); echo pk_common_fields( 'kariah' ); ?>
 		<div class="pk-intro">
-			<div><i class="fa-solid fa-hand-holding-heart"></i></div>
-			<div><strong>Badan Khairat Kematian <?php echo esc_html( pk_nama() ); ?></strong><br>
-			Yuran pendaftaran <strong><?php echo esc_html( pk_rm( pk_opt( 'yuran_daftar' ) ) ); ?></strong> (sekali seumur hidup) + yuran tahunan <strong><?php echo esc_html( pk_rm( pk_opt( 'yuran_tahunan' ) ) ); ?></strong>. Bayaran boleh dibuat <strong>sekaligus</strong> atau secara <strong>ansuran</strong>.</div>
+			<div><i class="fa-solid fa-mosque"></i></div>
+			<div><strong>Pendaftaran Ahli Kariah <?php echo esc_html( pk_nama() ); ?></strong><br>
+			Daftar <strong>sekali sahaja</strong>. Selepas pendaftaran diluluskan AJK<?php echo (float) pk_opt( 'yuran_kariah' ) > 0 ? ' dan yuran disahkan' : ''; ?>, anda akan menerima <strong>No. Kariah</strong> — No. Kariah ini diperlukan untuk mendaftar <a href="<?php echo esc_url( pk_page_url( 'khairat' ) ); ?>">Khairat Kematian</a> dan untuk mengaktifkan akaun Portal Ahli.<?php echo $fee > 0 ? ' Yuran pendaftaran ahli kariah: <strong>' . esc_html( pk_rm( $fee ) ) . '</strong>.' : ''; ?></div>
 		</div>
+		<?php echo pk_kariah_steps( 1 ); ?>
 
 		<div class="pk-card">
-			<h3 class="pk-h"><span class="pk-step">1</span> Jenis Permohonan</h3>
-			<div class="pk-choice">
-				<label><input type="radio" name="jenis_mohon" value="baru" <?php checked( pk_p( 'jenis_mohon', 'baru' ), 'baru' ); ?>> <span><i class="fa-solid fa-user-plus"></i> Ahli Baharu <small>Pendaftaran + Tahunan <?php echo (int) $yr; ?> = <?php echo esc_html( pk_rm( pk_opt( 'yuran_daftar' ) + pk_opt( 'yuran_tahunan' ) ) ); ?></small></span></label>
-				<label><input type="radio" name="jenis_mohon" value="baharui" <?php checked( pk_p( 'jenis_mohon' ), 'baharui' ); ?>> <span><i class="fa-solid fa-rotate"></i> Pembaharuan Ahli Sedia Ada <small>Yuran Tahunan <?php echo (int) $yr; ?> = <?php echo esc_html( pk_rm( pk_opt( 'yuran_tahunan' ) ) ); ?></small></span></label>
-			</div>
-			<div class="pk-tunggakan mt-3">
-				<label class="form-label">Tunggakan tahun sebelum <small class="text-secondary">(abaikan jika tiada)</small></label>
-				<div class="d-flex flex-wrap gap-3">
-				<?php for ( $y = $yr - 1; $y >= $yr - 3; $y-- ) : ?>
-					<label class="form-check"><input class="form-check-input" type="checkbox" name="tunggakan[]" value="<?php echo (int) $y; ?>" <?php checked( in_array( (string) $y, (array) ( $_POST['tunggakan'] ?? [] ), true ) ); ?>> <span class="form-check-label">Tahun <?php echo (int) $y; ?> (<?php echo esc_html( pk_rm( pk_opt( 'yuran_tahunan' ) ) ); ?>)</span></label>
-				<?php endfor; ?>
-				</div>
-			</div>
-		</div>
-
-		<div class="pk-card">
-			<h3 class="pk-h"><span class="pk-step">A</span> Maklumat Ahli</h3>
+			<h3 class="pk-h"><span class="pk-step">A</span> Maklumat Ahli Kariah</h3>
 			<div class="row g-3">
 				<?php
 				echo pk_field( 'Nama Penuh (seperti dalam KP)', 'nama', [ 'req' => 1, 'col' => 'col-12' ] );
@@ -445,8 +477,8 @@ add_shortcode( 'pk_borang_khairat', function () {
 		</div>
 
 		<div class="pk-card">
-			<h3 class="pk-h"><span class="pk-step">C</span> Maklumat Tanggungan</h3>
-			<p class="small text-secondary">Terhad kepada suami/isteri, anak yang belum berkahwin dan tinggal bersama, serta ibu bapa / ibu bapa mertua yang tinggal bersama. Tidak termasuk anak berusia 18 tahun ke atas yang sudah bekerja.</p>
+			<h3 class="pk-h"><span class="pk-step">C</span> Maklumat Tanggungan / Isi Rumah</h3>
+			<p class="small text-secondary">Anak yang tinggal bersama, serta ibu bapa / ibu bapa mertua yang tinggal bersama. <?php if ( (int) pk_opt( 'had_umur_anak' ) ) : ?>Untuk Khairat Kematian, hanya anak berumur bawah <?php echo (int) pk_opt( 'had_umur_anak' ); ?> tahun dilindungi di bawah ketua keluarga — anak yang lebih tua perlu mendaftar sendiri.<?php endif; ?></p>
 			<div class="pk-rows" data-pk-rows="tg" data-pk-max="12">
 				<?php foreach ( $tg as $i => $r ) { echo pk_tg_row( $i, $r ); } ?>
 			</div>
@@ -454,15 +486,103 @@ add_shortcode( 'pk_borang_khairat', function () {
 			<button type="button" class="btn btn-sm btn-outline-success mt-2" data-pk-add="tg"><i class="fa-solid fa-plus"></i> Tambah tanggungan</button>
 		</div>
 
+		<?php if ( $fee > 0 ) { echo pk_payment_block( 'Yuran Ahli Kariah (sekali)' ); } ?>
+
+		<div class="pk-card">
+			<h3 class="pk-h"><span class="pk-step">D</span> Perakuan</h3>
+			<details class="pk-terms"><summary>Baca Terma &amp; Syarat</summary><?php echo pk_terma_kariah(); ?></details>
+			<label class="form-check mt-3"><input class="form-check-input" type="checkbox" name="perakuan" value="1" required <?php checked( ! empty( $_POST['perakuan'] ) ); ?>> <span class="form-check-label">Saya mengesahkan bahawa saya bermastautin dalam kawasan kariah <?php echo esc_html( pk_nama() ); ?>, maklumat yang diberi adalah benar, dan saya <strong>bersetuju</strong> dengan terma dan syarat.</span></label>
+		</div>
+
+		<button type="submit" class="btn btn-mp btn-lg"><i class="fa-solid fa-paper-plane"></i> Hantar Pendaftaran Ahli Kariah</button>
+	</form>
+	<?php
+	return ob_get_clean();
+} );
+
+/** Two-step strip: 1 Ahli Kariah → 2 Khairat Kematian. */
+function pk_kariah_steps( $cur ) {
+	$s = [ 1 => [ 'Daftar Ahli Kariah', 'Sekali sahaja · terima No. Kariah', pk_page_url( 'kariah' ) ], 2 => [ 'Daftar Khairat Kematian', 'Tahunan · perlukan No. Kariah', pk_page_url( 'khairat' ) ] ];
+	$h = '<ol class="pk-kstep">';
+	foreach ( $s as $n => [ $t, $d, $u ] ) {
+		$h .= '<li class="' . ( $n === $cur ? 'is-cur' : '' ) . '"><a href="' . esc_url( $u ) . '"><span class="pk-kstep-no">' . $n . '</span><span><strong>' . esc_html( $t ) . '</strong><small>' . esc_html( $d ) . '</small></span></a></li>';
+	}
+	return $h . '</ol>';
+}
+
+function pk_terma_kariah() {
+	return '<ol class="small mb-0">'
+		. '<li>Ahli kariah ialah orang Islam yang bermastautin dalam kawasan kariah ' . esc_html( pk_nama() ) . ' seperti yang ditetapkan oleh peraturan masjid dan pihak berkuasa agama negeri.</li>'
+		. '<li>Pendaftaran Ahli Kariah dibuat sekali sahaja. No. Kariah akan diberikan selepas permohonan disemak dan diluluskan oleh AJK.</li>'
+		. '<li>Hanya Ahli Kariah yang aktif (mempunyai No. Kariah) layak mendaftar sebagai ahli Badan Khairat Kematian.</li>'
+		. '<li>Ahli bertanggungjawab mengemas kini maklumat diri, pasangan dan tanggungan melalui Portal Ahli atau pejabat masjid.</li>'
+		. '<li>Maklumat peribadi digunakan untuk urusan pentadbiran masjid sahaja dan tidak akan didedahkan kepada pihak luar.</li></ol>';
+}
+
+/* ================================================================= [pk_borang_khairat] — langkah 2: Khairat (Ahli Kariah sahaja) */
+
+add_shortcode( 'pk_borang_khairat', function () {
+	pk_enqueue_public();
+	if ( $ok = pk_render_success( 'khairat' ) ) { return $ok; }
+	if ( ! pk_opt( 'buka_khairat' ) ) { return '<div class="mp-note">Pendaftaran dalam talian ditutup buat masa ini. Sila hubungi pejabat masjid.</div>'; }
+	$yr  = pk_year();
+	$me  = is_user_logged_in() ? pk_ahli_for_user() : null;
+	$kar = pk_page_url( 'kariah' );
+	ob_start(); ?>
+	<form class="pk-form" id="pk-top" method="post" enctype="multipart/form-data" data-pk-form="khairat">
+		<?php echo pk_render_errors(); echo pk_common_fields( 'khairat' ); ?>
+		<div class="pk-intro">
+			<div><i class="fa-solid fa-hand-holding-heart"></i></div>
+			<div><strong>Badan Khairat Kematian <?php echo esc_html( pk_nama() ); ?></strong><br>
+			Yuran pendaftaran <strong><?php echo esc_html( pk_rm( pk_opt( 'yuran_daftar' ) ) ); ?></strong> (sekali seumur hidup) + yuran tahunan <strong><?php echo esc_html( pk_rm( pk_opt( 'yuran_tahunan' ) ) ); ?></strong>. Bayaran boleh dibuat <strong>sekaligus</strong> atau secara <strong>ansuran</strong>.</div>
+		</div>
+		<?php echo pk_kariah_steps( 2 ); ?>
+
+		<div class="pk-card">
+			<h3 class="pk-h"><span class="pk-step">1</span> Pengesahan Ahli Kariah</h3>
+			<?php if ( $me && pk_is_kariah_aktif( $me ) ) : ?>
+				<div class="pk-kv"><div><span>Nama</span><?php echo esc_html( $me['nama'] ); ?></div><div><span>No. Kariah</span><?php echo esc_html( $me['no_ahli'] ); ?></div><div><span>Khairat</span><?php echo pk_badge( 'status_khairat', $me['khairat'] ); ?></div></div>
+				<p class="small text-secondary mb-0 mt-2">Anda log masuk ke Portal Ahli — permohonan ini akan direkodkan pada keahlian anda.</p>
+			<?php elseif ( $me ) : ?>
+				<div class="alert alert-warning mb-0"><i class="fa-solid fa-hourglass-half me-1"></i> Pendaftaran Ahli Kariah anda (<?php echo esc_html( pk_label( 'status_ahli', $me['status'] ) ); ?>) belum lengkap. Khairat Kematian boleh didaftarkan selepas anda menerima No. Kariah.</div>
+			<?php else : ?>
+				<div class="pk-need-daftar mb-3"><i class="fa-solid fa-circle-exclamation"></i><div><strong>Khairat Kematian hanya untuk Ahli Kariah.</strong> Anda perlu <a href="<?php echo esc_url( $kar ); ?>">mendaftar sebagai Ahli Kariah</a> dahulu dan menerima No. Kariah selepas diluluskan AJK.</div></div>
+				<div class="row g-3">
+					<?php
+					echo pk_field( 'No. Kariah', 'no_kariah', [ 'req' => 1, 'attrs' => ' placeholder="cth. KK-0012" autocomplete="off" maxlength="20"', 'help' => 'Seperti yang diberikan selepas pendaftaran Ahli Kariah diluluskan.' ] );
+					echo pk_field( 'No. Kad Pengenalan', 'no_kp', [ 'req' => 1, 'attrs' => ' inputmode="numeric" placeholder="cth. 800101105123" pattern="[0-9\- ]{12,14}"' ] );
+					?>
+				</div>
+				<p class="small text-secondary mb-0 mt-2">Belum ada No. Kariah? <a href="<?php echo esc_url( $kar ); ?>">Daftar Ahli Kariah &rarr;</a></p>
+			<?php endif; ?>
+		</div>
+
+		<div class="pk-card">
+			<h3 class="pk-h"><span class="pk-step">2</span> Jenis Permohonan</h3>
+			<div class="pk-choice">
+				<label><input type="radio" name="jenis_mohon" value="baru" <?php checked( pk_p( 'jenis_mohon', 'baru' ), 'baru' ); ?>> <span><i class="fa-solid fa-user-plus"></i> Ahli Khairat Baharu <small>Pendaftaran + Tahunan <?php echo (int) $yr; ?> = <?php echo esc_html( pk_rm( pk_opt( 'yuran_daftar' ) + pk_opt( 'yuran_tahunan' ) ) ); ?></small></span></label>
+				<label><input type="radio" name="jenis_mohon" value="baharui" <?php checked( pk_p( 'jenis_mohon' ), 'baharui' ); ?>> <span><i class="fa-solid fa-rotate"></i> Pembaharuan Yuran Tahunan <small>Tahunan <?php echo (int) $yr; ?> = <?php echo esc_html( pk_rm( pk_opt( 'yuran_tahunan' ) ) ); ?></small></span></label>
+			</div>
+			<div class="pk-tunggakan mt-3">
+				<label class="form-label">Tunggakan tahun sebelum <small class="text-secondary">(abaikan jika tiada)</small></label>
+				<div class="d-flex flex-wrap gap-3">
+				<?php for ( $y = $yr - 1; $y >= $yr - 3; $y-- ) : ?>
+					<label class="form-check"><input class="form-check-input" type="checkbox" name="tunggakan[]" value="<?php echo (int) $y; ?>" <?php checked( in_array( (string) $y, (array) ( $_POST['tunggakan'] ?? [] ), true ) ); ?>> <span class="form-check-label">Tahun <?php echo (int) $y; ?> (<?php echo esc_html( pk_rm( pk_opt( 'yuran_tahunan' ) ) ); ?>)</span></label>
+				<?php endfor; ?>
+				</div>
+			</div>
+			<p class="small text-secondary mt-3 mb-0"><i class="fa-solid fa-people-roof me-1"></i> Yuran khairat dibayar oleh ketua keluarga dan melindungi pasangan serta anak tanggungan yang direkodkan dalam rekod Ahli Kariah anda. Kemas kini melalui <a href="<?php echo esc_url( pk_page_url( 'portal' ) ); ?>">Portal Ahli</a> atau hubungi AJK.</p>
+		</div>
+
 		<?php echo pk_payment_block( '' ); ?>
 
 		<div class="pk-card">
-			<h3 class="pk-h"><span class="pk-step">D</span> Perakuan Ahli</h3>
+			<h3 class="pk-h"><span class="pk-step">3</span> Perakuan Ahli</h3>
 			<details class="pk-terms"><summary>Baca Terma &amp; Syarat</summary><?php echo pk_terma_khairat(); ?></details>
-			<label class="form-check mt-3"><input class="form-check-input" type="checkbox" name="perakuan" value="1" required <?php checked( ! empty( $_POST['perakuan'] ) ); ?>> <span class="form-check-label">Saya seperti nama di atas <strong>bersetuju</strong> dengan terma dan syarat yang telah ditetapkan, dan mengesahkan maklumat yang diberi adalah benar.</span></label>
+			<label class="form-check mt-3"><input class="form-check-input" type="checkbox" name="perakuan" value="1" required <?php checked( ! empty( $_POST['perakuan'] ) ); ?>> <span class="form-check-label">Saya <strong>bersetuju</strong> dengan terma dan syarat Badan Khairat Kematian, dan mengesahkan maklumat yang diberi adalah benar.</span></label>
 		</div>
 
-		<button type="submit" class="btn btn-mp btn-lg"><i class="fa-solid fa-paper-plane"></i> Hantar Pendaftaran</button>
+		<button type="submit" class="btn btn-mp btn-lg"<?php echo ( $me && ! pk_is_kariah_aktif( $me ) ) ? ' disabled' : ''; ?>><i class="fa-solid fa-paper-plane"></i> Hantar Pendaftaran Khairat</button>
 	</form>
 	<?php
 	return ob_get_clean();
@@ -605,8 +725,16 @@ add_shortcode( 'pk_semak', function () {
 	echo '<div class="pk-result">';
 	foreach ( $ahli as $a ) {
 		$paid = pk_ahli_paid_year( $a['id'], $yr );
-		echo '<div class="pk-card"><h3 class="pk-h"><i class="fa-solid fa-hand-holding-heart text-mp"></i> Khairat Kematian</h3>';
-		echo '<div class="pk-kv"><div><span>Nama</span>' . esc_html( $a['nama'] ) . '</div><div><span>No. Ahli</span>' . esc_html( $a['no_ahli'] ?: 'Belum diberikan' ) . '</div><div><span>Status</span>' . pk_badge( 'status_ahli', $a['status'] ) . '</div><div><span>Yuran ' . (int) $yr . '</span>' . ( $paid ? '<span class="pk-badge pk-b-ok">Dijelaskan</span>' : '<span class="pk-badge pk-b-warn">Belum dijelaskan</span>' ) . '</div></div>';
+		echo '<div class="pk-card"><h3 class="pk-h"><i class="fa-solid fa-mosque text-mp"></i> Ahli Kariah &amp; Khairat Kematian</h3>';
+		echo '<div class="pk-kv"><div><span>Nama</span>' . esc_html( $a['nama'] ) . '</div><div><span>No. Kariah</span>' . esc_html( $a['no_ahli'] ?: 'Belum diberikan' ) . '</div><div><span>Status Ahli Kariah</span>' . pk_badge( 'status_ahli', $a['status'] ) . '</div><div><span>Khairat Kematian</span>' . pk_badge( 'status_khairat', $a['khairat'] ) . '</div>'
+			. ( in_array( $a['khairat'], [ 'aktif', 'menunggu' ], true ) ? '<div><span>Yuran ' . (int) $yr . '</span>' . ( $paid ? '<span class="pk-badge pk-b-ok">Dijelaskan</span>' : '<span class="pk-badge pk-b-warn">Belum dijelaskan</span>' ) . '</div>' : '' ) . '</div>';
+		if ( pk_is_kariah_aktif( $a ) && ! in_array( $a['khairat'], [ 'aktif', 'menunggu' ], true ) ) {
+			echo '<p class="mt-2 mb-2"><a class="btn btn-leaf btn-sm" href="' . esc_url( pk_page_url( 'khairat' ) ) . '"><i class="fa-solid fa-hand-holding-heart"></i> Daftar Khairat Kematian</a> <small class="text-secondary">guna No. Kariah anda</small></p>';
+		} elseif ( 'lulus' === $a['status'] ) {
+			echo '<p class="small text-secondary mt-2 mb-2">Pendaftaran Ahli Kariah telah diluluskan. No. Kariah akan diberikan selepas bayaran yuran Ahli Kariah disahkan — hantar bukti bayaran di bawah.</p>';
+		} elseif ( 'menunggu' === $a['status'] ) {
+			echo '<p class="small text-secondary mt-2 mb-2">Pendaftaran Ahli Kariah sedang disemak oleh AJK. No. Kariah akan diberikan selepas diluluskan.</p>';
+		}
 		echo pk_public_pelan_table( 'khairat', $a['id'], $kp, $hp );
 		echo '</div>';
 	}

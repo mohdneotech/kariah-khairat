@@ -67,7 +67,7 @@ function pk_page_bayaran() {
 				?></td></tr>
 		<?php endforeach; ?></tbody></table>
 	<div class="tablenav bottom"><?php echo pk_pager( (int) $sum['n'], $per, $cur ); ?></div>
-	<p class="description">Mengesahkan bayaran pertama permohonan khairat yang masih "Menunggu" akan mengaktifkan ahli tersebut dan memberikan No. Ahli secara automatik.</p>
+	<p class="description">Mengesahkan bayaran pertama permohonan khairat yang masih "Menunggu" akan mengaktifkan keahlian khairat tersebut (Ahli Kariah mesti sudah aktif). Jika yuran Ahli Kariah ditetapkan, mengesahkan bayaran yuran kariah akan meluluskan Ahli Kariah dan memberikan No. Kariah.</p>
 	</div>
 	<?php
 }

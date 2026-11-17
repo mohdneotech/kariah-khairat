@@ -15,16 +15,16 @@ add_action( 'wp_dashboard_setup', function () {
 /** Cached copy of the main dashboard numbers + a few extra counts for the widgets. */
 function pk_dw_data() {
 	$d = get_transient( 'pk_dw_data' );
-	if ( is_array( $d ) && ( $d['_v'] ?? 0 ) === 1 ) { return $d; }
+	if ( is_array( $d ) && ( $d['_v'] ?? 0 ) === 2 ) { return $d; }
 	global $wpdb;
 	$d = pk_dashboard_data();
 	$A = pk_t( 'ahli' );
 	$d['jumlah']    = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $A" );
 	$d['baru_bln']  = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM $A WHERE created_at >= %s AND status<>'ditolak'", current_time( 'Y-m-01 00:00:00' ) ) );
 	$d['baru_thn']  = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM $A WHERE created_at >= %s AND status<>'ditolak'", current_time( 'Y-01-01 00:00:00' ) ) );
-	$d['tanggungan'] = (int) $wpdb->get_var( "SELECT COUNT(*) FROM " . pk_t( 'tanggungan' ) . " t JOIN $A a ON a.id=t.ahli_id WHERE a.status='aktif'" );
+	$d['tanggungan'] = (int) $wpdb->get_var( "SELECT COUNT(*) FROM " . pk_t( 'tanggungan' ) . " t JOIN $A a ON a.id=t.ahli_id WHERE a.status='aktif' AND a.khairat='aktif'" );
 	$d['kutip_bln'] = (float) $wpdb->get_var( $wpdb->prepare( 'SELECT COALESCE(SUM(jumlah),0) FROM ' . pk_t( 'bayaran' ) . " WHERE status='sah' AND tarikh >= %s", current_time( 'Y-m-01' ) ) );
-	$d['_v']        = 1;
+	$d['_v']        = 2;
 	unset( $d['age'] ); // not used here; keeps the transient small
 	set_transient( 'pk_dw_data', $d, 5 * MINUTE_IN_SECONDS );
 	return $d;
@@ -65,16 +65,16 @@ function pk_dw_kariah() {
 	$n  = fn( $k ) => (int) ( $st[ $k ] ?? 0 );
 	echo '<div class="pkdw">';
 	echo '<div class="pkdw-tiles">';
-	echo pk_dw_tile( 'Ahli aktif', number_format_i18n( $d['aktif'] ), number_format_i18n( $d['jumlah'] ) . ' rekod keseluruhan', pk_dw_url( 'pk-ahli', [ 'status' => 'aktif' ] ) );
+	echo pk_dw_tile( 'Ahli Kariah aktif', number_format_i18n( $d['kariah'] ), number_format_i18n( $d['aktif'] ) . ' ahli khairat · ' . number_format_i18n( $d['jumlah'] ) . ' rekod', pk_dw_url( 'pk-ahli', [ 'status' => 'aktif' ] ) );
 	echo pk_dw_tile( 'Jiwa dilindungi', number_format_i18n( $d['jiwa'] ), 'ahli + pasangan + ' . number_format_i18n( $d['tanggungan'] ) . ' tanggungan' );
 	echo pk_dw_tile( 'Ahli baharu', number_format_i18n( $d['baru_bln'] ), 'bulan ini · ' . number_format_i18n( $d['baru_thn'] ) . ' tahun ' . (int) $d['yr'] );
-	echo pk_dw_tile( 'Guna Portal Ahli', number_format_i18n( $d['portal'] ), $d['aktif'] ? round( $d['portal'] / $d['aktif'] * 100 ) . '% ahli aktif' : '—' );
+	echo pk_dw_tile( 'Guna Portal Ahli', number_format_i18n( $d['portal'] ), $d['kariah'] ? round( $d['portal'] / $d['kariah'] * 100 ) . '% ahli kariah aktif' : '—' );
 	echo '</div>';
 
 	echo '<h4>Status keahlian</h4>';
 	echo pk_dw_stack( [
 		[ 'Aktif', $n( 'aktif' ), 'ok', pk_dw_url( 'pk-ahli', [ 'status' => 'aktif' ] ) ],
-		[ 'Menunggu', $n( 'menunggu' ), 'warn', pk_dw_url( 'pk-ahli', [ 'status' => 'menunggu' ] ) ],
+		[ 'Menunggu', $n( 'menunggu' ) + $n( 'lulus' ), 'warn', pk_dw_url( 'pk-ahli', [ 'status' => 'menunggu' ] ) ],
 		[ 'Tidak aktif', $n( 'tidak_aktif' ), 'mute', pk_dw_url( 'pk-ahli', [ 'status' => 'tidak_aktif' ] ) ],
 		[ 'Meninggal', $n( 'meninggal' ), 'dark', pk_dw_url( 'pk-ahli', [ 'status' => 'meninggal' ] ) ],
 		[ 'Ditolak', $n( 'ditolak' ), 'bad', pk_dw_url( 'pk-ahli', [ 'status' => 'ditolak' ] ) ],
@@ -91,10 +91,11 @@ function pk_dw_kariah() {
 	}
 
 	$todo = [];
-	if ( $d['pend_a'] ) { $todo[] = '<a href="' . esc_url( pk_dw_url( 'pk-ahli', [ 'status' => 'menunggu' ] ) ) . '">' . (int) $d['pend_a'] . ' pendaftaran menunggu pengesahan</a>'; }
+	if ( $d['pend_a'] - $d['pend_kh'] ) { $todo[] = '<a href="' . esc_url( pk_dw_url( 'pk-ahli', [ 'status' => 'menunggu' ] ) ) . '">' . (int) ( $d['pend_a'] - $d['pend_kh'] ) . ' Ahli Kariah menunggu kelulusan</a>'; }
+	if ( $d['pend_kh'] ) { $todo[] = '<a href="' . esc_url( pk_dw_url( 'pk-ahli', [ 'khairat' => 'menunggu' ] ) ) . '">' . (int) $d['pend_kh'] . ' pendaftaran khairat menunggu</a>'; }
 	if ( $d['pend_u'] ) { $todo[] = '<a href="' . esc_url( pk_dw_url( 'pk-kemaskini' ) ) . '">' . (int) $d['pend_u'] . ' permohonan kemas kini ahli</a>'; }
 	echo $todo ? '<p class="pkdw-alert"><span class="dashicons dashicons-warning"></span> ' . implode( ' · ', $todo ) . '</p>' : '<p class="pkdw-okline"><span class="dashicons dashicons-yes-alt"></span> Tiada pendaftaran atau kemas kini menunggu.</p>';
-	echo '<p class="pkdw-foot"><a href="' . esc_url( pk_dw_url( 'pk-dashboard' ) ) . '">Papan Pemuka Kariah →</a> <a href="' . esc_url( pk_dw_url( 'pk-ahli-baru' ) ) . '">+ Daftar Ahli</a></p>';
+	echo '<p class="pkdw-foot"><a href="' . esc_url( pk_dw_url( 'pk-dashboard' ) ) . '">Papan Pemuka Kariah →</a> <a href="' . esc_url( pk_dw_url( 'pk-ahli-baru' ) ) . '">+ Daftar Ahli Kariah</a></p>';
 	echo '</div>';
 }
 
@@ -105,11 +106,11 @@ function pk_dw_khairat() {
 	$pct   = $d['aktif'] ? round( $d['paid'] / $d['aktif'] * 100 ) : 0;
 	echo '<div class="pkdw">';
 	echo '<div class="pkdw-ring-row"><div class="pkdw-ring" style="--p:' . (int) $pct . '"><b>' . (int) $pct . '%</b></div><div><h4>Yuran khairat ' . $yr . ' dijelaskan</h4>'
-		. '<p>' . number_format_i18n( $d['paid'] ) . ' daripada ' . number_format_i18n( $d['aktif'] ) . ' ahli aktif</p></div></div>';
+		. '<p>' . number_format_i18n( $d['paid'] ) . ' daripada ' . number_format_i18n( $d['aktif'] ) . ' ahli khairat aktif</p></div></div>';
 	echo pk_dw_stack( [
-		[ 'Selesai', (int) $d['paid'], 'ok', pk_dw_url( 'pk-ahli', [ 'status' => 'aktif', 'bayar' => 'berbayar' ] ) ],
-		[ 'Belum selesai bayar', (int) $d['ansur'], 'info', pk_dw_url( 'pk-ahli', [ 'status' => 'aktif', 'bayar' => 'belum' ] ) ],
-		[ 'Tiada pelan yuran', $belum, 'bad', pk_dw_url( 'pk-ahli', [ 'status' => 'aktif', 'bayar' => 'belum' ] ) ],
+		[ 'Selesai', (int) $d['paid'], 'ok', pk_dw_url( 'pk-ahli', [ 'status' => 'aktif', 'khairat' => 'aktif', 'bayar' => 'berbayar' ] ) ],
+		[ 'Belum selesai bayar', (int) $d['ansur'], 'info', pk_dw_url( 'pk-ahli', [ 'status' => 'aktif', 'khairat' => 'aktif', 'bayar' => 'belum' ] ) ],
+		[ 'Tiada pelan yuran', $belum, 'bad', pk_dw_url( 'pk-ahli', [ 'status' => 'aktif', 'khairat' => 'aktif', 'bayar' => 'belum' ] ) ],
 	] );
 	echo '<div class="pkdw-tiles">';
 	echo pk_dw_tile( 'Kutipan disahkan ' . $yr, esc_html( pk_rm( $d['kutip'] ) ), esc_html( pk_rm( $d['kutip_bln'] ) ) . ' bulan ini' );

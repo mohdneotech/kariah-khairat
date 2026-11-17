@@ -50,8 +50,11 @@ function pk_install_schema() {
   created_by bigint(20) unsigned NOT NULL DEFAULT 0,
   user_id bigint(20) unsigned NOT NULL DEFAULT 0,
   gambar varchar(255) NOT NULL DEFAULT '',
+  khairat varchar(20) NOT NULL DEFAULT '',
+  tarikh_khairat date NULL,
   PRIMARY KEY  (id),
   KEY no_kp (no_kp),
+  KEY khairat (khairat),
   KEY status (status),
   KEY no_ahli (no_ahli),
   KEY user_id (user_id)
@@ -187,6 +190,13 @@ function pk_install_schema() {
   KEY papar (status,papar_hingga)
 ) $c;" );
 
+	// 1.6.0: a member row is now the Ahli Kariah record (status / no_ahli = kariah status / No. Kariah);
+	// Khairat Kematian membership is tracked separately in `khairat`. Existing rows were khairat members.
+	$old = (int) get_option( 'pk_db_ver', 0 );
+	if ( $old && $old < 5 ) {
+		$wpdb->query( "UPDATE $a SET khairat = IF(status IN ('aktif','menunggu','tidak_aktif','ditolak'), status, 'aktif'), tarikh_khairat = tarikh_daftar WHERE khairat = '' AND EXISTS(SELECT 1 FROM $p pp WHERE pp.jenis='khairat' AND pp.ref_id=$a.id AND pp.kategori<>'kariah')" );
+	}
+
 	add_role( 'pk_ajk', 'AJK Kariah', [ 'read' => true, 'upload_files' => true, PK_CAP => true ] );
 	add_role( 'pk_ahli', 'Ahli Kariah', [ 'read' => true ] );
 	update_option( 'pk_db_ver', PK_DB_VER, false );
@@ -194,7 +204,7 @@ function pk_install_schema() {
 
 /* ================================================================= AHLI */
 
-const PK_AHLI_FIELDS = [ 'user_id', 'no_ahli', 'nama', 'no_kp', 'no_hp', 'email', 'alamat', 'kawasan', 'pekerjaan', 'sektor', 'majikan', 'tel_p', 'tel_r', 'p_nama', 'p_kp', 'p_hp', 'p_pekerjaan', 'p_sektor', 'p_majikan', 'p_tel_p', 'status', 'sumber', 'tarikh_daftar', 'catatan' ];
+const PK_AHLI_FIELDS = [ 'user_id', 'no_ahli', 'nama', 'no_kp', 'no_hp', 'email', 'alamat', 'kawasan', 'pekerjaan', 'sektor', 'majikan', 'tel_p', 'tel_r', 'p_nama', 'p_kp', 'p_hp', 'p_pekerjaan', 'p_sektor', 'p_majikan', 'p_tel_p', 'status', 'sumber', 'tarikh_daftar', 'catatan', 'khairat', 'tarikh_khairat' ];
 
 function pk_get_ahli( $id ) {
 	global $wpdb;
@@ -204,6 +214,7 @@ function pk_get_ahli( $id ) {
 function pk_save_ahli_data( array $d, $id = 0 ) {
 	global $wpdb;
 	$row = array_intersect_key( $d, array_flip( PK_AHLI_FIELDS ) );
+	unset( $row['no_ahli'] ); // No. Kariah is issued by the system only (see below) — never taken from input
 	foreach ( [ 'no_kp', 'p_kp' ] as $f ) { if ( isset( $row[ $f ] ) ) { $row[ $f ] = pk_digits( $row[ $f ] ); } }
 	if ( isset( $row['nama'] ) ) { $row['nama'] = mb_strtoupper( trim( $row['nama'] ) ); }
 	if ( isset( $row['p_nama'] ) ) { $row['p_nama'] = mb_strtoupper( trim( $row['p_nama'] ) ); }
@@ -216,12 +227,55 @@ function pk_save_ahli_data( array $d, $id = 0 ) {
 		$wpdb->insert( pk_t( 'ahli' ), $row );
 		$id = (int) $wpdb->insert_id;
 	}
-	// assign membership number when a member becomes active
+	// No. Kariah is issued only when BOTH the registration is approved (status Aktif) AND the kariah fee is paid / exempted.
 	$a = pk_get_ahli( $id );
+	if ( $a && 'aktif' === $a['status'] && '' === (string) $a['no_ahli'] && ! pk_kariah_yuran_ok( $id ) ) {
+		$wpdb->update( pk_t( 'ahli' ), [ 'status' => 'lulus' ], [ 'id' => $id ] );
+		$a['status'] = 'lulus';
+		$GLOBALS['pk_tunggu_bayar'][] = $id;
+		// registered before a kariah fee existed: create the fee plan so there is something to pay
+		if ( ! $wpdb->get_var( $wpdb->prepare( 'SELECT 1 FROM ' . pk_t( 'pelan' ) . " WHERE jenis='khairat' AND kategori='kariah' AND ref_id=%d AND status<>'batal' LIMIT 1", $id ) ) ) {
+			pk_pelan_create( [ 'jenis' => 'khairat', 'ref_id' => $id, 'kategori' => 'kariah', 'tajuk' => 'Yuran Pendaftaran Ahli Kariah', 'jumlah' => pk_opt( 'yuran_kariah' ), 'cara' => 'sekaligus' ] );
+			pk_log( $id, 'kariah_yuran', 'Pelan yuran Ahli Kariah ' . pk_rm( pk_opt( 'yuran_kariah' ) ) . ' dicipta semasa kelulusan' );
+		}
+	} elseif ( $a && 'lulus' === $a['status'] && pk_kariah_yuran_ok( $id ) ) {
+		$wpdb->update( pk_t( 'ahli' ), [ 'status' => 'aktif' ], [ 'id' => $id ] );
+		$a['status'] = 'aktif';
+		pk_log( $id, 'kariah_lulus', 'Ahli Kariah aktif — pendaftaran diluluskan dan yuran disahkan' );
+	}
+	// assign the No. Kariah when the kariah membership becomes active
 	if ( $a && 'aktif' === $a['status'] && '' === $a['no_ahli'] ) {
 		$wpdb->update( pk_t( 'ahli' ), [ 'no_ahli' => pk_next_no_ahli(), 'tarikh_daftar' => $a['tarikh_daftar'] ?: pk_today() ], [ 'id' => $id ] );
 	}
+	// Khairat can only be active for an active (or deceased) Ahli Kariah
+	if ( $a && 'aktif' === $a['khairat'] && in_array( $a['status'], [ 'menunggu', 'lulus', 'ditolak' ], true ) ) {
+		$wpdb->update( pk_t( 'ahli' ), [ 'khairat' => 'menunggu' ], [ 'id' => $id ] );
+	} elseif ( $a && 'aktif' === $a['khairat'] && ! $a['tarikh_khairat'] ) {
+		$wpdb->update( pk_t( 'ahli' ), [ 'tarikh_khairat' => pk_today() ], [ 'id' => $id ] );
+	}
 	return $id;
+}
+
+/** Kariah fee settled? Paid kariah plan; or no plan and fee RM0; or recorded exemption (log `kariah_kecuali`). */
+function pk_kariah_yuran_ok( $id ) {
+	global $wpdb;
+	$plans = $wpdb->get_col( $wpdb->prepare( 'SELECT status FROM ' . pk_t( 'pelan' ) . " WHERE jenis='khairat' AND kategori='kariah' AND ref_id=%d AND status<>'batal'", $id ) );
+	if ( $plans ) { return in_array( 'selesai', $plans, true ); }
+	if ( (float) pk_opt( 'yuran_kariah' ) <= 0 ) { return true; }
+	return (bool) $wpdb->get_var( $wpdb->prepare( 'SELECT 1 FROM ' . pk_t( 'log' ) . " WHERE ahli_id=%d AND tindakan='kariah_kecuali' LIMIT 1", $id ) );
+}
+
+/** Is this an active Ahli Kariah (has a No. Kariah)? */
+function pk_is_kariah_aktif( $a ) { return $a && 'aktif' === $a['status'] && '' !== (string) $a['no_ahli']; }
+
+/** Find an active kariah record by No. Kariah + No. KP (both must match). */
+function pk_find_kariah( $no_kariah, $kp ) {
+	global $wpdb;
+	$no = strtoupper( preg_replace( '/\s+/', '', (string) $no_kariah ) );
+	$kp = pk_digits( $kp );
+	if ( '' === $no || 12 !== strlen( $kp ) ) { return null; }
+	if ( preg_match( '/^([A-Z]*)-?(\d{1,6})$/', $no, $m ) ) { $no = sprintf( '%s-%04d', $m[1] ?: ( pk_opt( 'prefix_ahli' ) ?: 'KK' ), (int) $m[2] ); }
+	return $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . pk_t( 'ahli' ) . ' WHERE no_ahli=%s AND no_kp=%s ORDER BY id DESC LIMIT 1', $no, $kp ), ARRAY_A );
 }
 
 function pk_next_no_ahli() {
@@ -390,6 +444,11 @@ function pk_pelan_refresh( $pelan_id ) {
 	$paid = (float) $wpdb->get_var( $wpdb->prepare( 'SELECT COALESCE(SUM(jumlah),0) FROM ' . pk_t( 'bayaran' ) . " WHERE pelan_id=%d AND status='sah'", $pelan_id ) );
 	$st   = ( $paid + 0.001 >= (float) $p['jumlah'] && (float) $p['jumlah'] > 0 ) ? 'selesai' : 'aktif';
 	if ( $st !== $p['status'] ) { $wpdb->update( pk_t( 'pelan' ), [ 'status' => $st ], [ 'id' => $pelan_id ] ); }
+	// kariah fee settled → an approved registration becomes Aktif and receives its No. Kariah
+	if ( 'selesai' === $st && 'khairat' === $p['jenis'] && 'kariah' === $p['kategori'] ) {
+		$a = pk_get_ahli( $p['ref_id'] );
+		if ( $a && 'lulus' === $a['status'] ) { pk_save_ahli_data( [], (int) $a['id'] ); }
+	}
 }
 
 function pk_delete_pelan( $id ) {

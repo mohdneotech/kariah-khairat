@@ -35,9 +35,9 @@ add_action( 'admin_post_pk_export_ahli', function () {
 		$tg = pk_tanggungan_get( $r['id'] );
 		$out[] = [ $r['no_ahli'], $r['nama'], pk_fmt_kp( $r['no_kp'] ), $r['no_hp'], $r['email'], $r['alamat'], $r['kawasan'], $r['pekerjaan'], $r['sektor'], $r['majikan'],
 			$r['p_nama'], pk_fmt_kp( $r['p_kp'] ), $r['p_hp'], count( $tg ), implode( '; ', array_map( fn( $t ) => $t['nama'] . ( $t['hubungan'] ? ' (' . $t['hubungan'] . ')' : '' ), $tg ) ),
-			pk_label( 'status_ahli', $r['status'] ), $r['paid'] ? 'Ya' : 'Tidak', number_format( (float) $r['baki'], 2, '.', '' ), pk_label( 'sumber', $r['sumber'] ), $r['tarikh_daftar'], $r['created_at'], $r['catatan'] ];
+			pk_label( 'status_ahli', $r['status'] ), pk_label( 'status_khairat', $r['khairat'] ), $r['paid'] ? 'Ya' : 'Tidak', number_format( (float) $r['baki'], 2, '.', '' ), pk_label( 'sumber', $r['sumber'] ), $r['tarikh_daftar'], $r['created_at'], $r['catatan'] ];
 	}
-	pk_csv_out( 'ahli-khairat', [ 'No. Ahli', 'Nama', 'No. KP', 'No. HP', 'E-mel', 'Alamat', 'Kawasan', 'Pekerjaan', 'Sektor', 'Majikan', 'Pasangan', 'KP Pasangan', 'HP Pasangan', 'Bil. Tanggungan', 'Tanggungan', 'Status', "Yuran $yr dijelaskan", 'Baki (RM)', 'Sumber', 'Tarikh Daftar', 'Direkod', 'Catatan' ], $out );
+	pk_csv_out( 'ahli-kariah-khairat', [ 'No. Kariah', 'Nama', 'No. KP', 'No. HP', 'E-mel', 'Alamat', 'Kawasan', 'Pekerjaan', 'Sektor', 'Majikan', 'Pasangan', 'KP Pasangan', 'HP Pasangan', 'Bil. Tanggungan', 'Tanggungan', 'Status Ahli Kariah', 'Status Khairat', "Yuran $yr dijelaskan", 'Baki (RM)', 'Sumber', 'Tarikh Daftar', 'Direkod', 'Catatan' ], $out );
 } );
 
 add_action( 'admin_post_pk_export_korban', function () {
@@ -60,7 +60,7 @@ add_action( 'admin_post_pk_export_bayaran', function () {
 	[ , $rows ] = pk_bayaran_query( pk_bayaran_filters_from_get(), 0 );
 	$out = [];
 	foreach ( $rows as $r ) { $out[] = [ $r['tarikh'], $r['nama'], $r['no_ahli'], 'khairat' === $r['jenis'] ? 'Khairat' : 'Korban/Aqiqah', $r['tajuk'], pk_label( 'mod', $r['cara'] ), $r['jumlah'], pk_label( 'kaedah', $r['kaedah'] ), $r['no_resit'], pk_label( 'status_bayar', $r['status'] ), pk_label( 'sumber', $r['sumber'] ), $r['catatan'] ]; }
-	pk_csv_out( 'bayaran', [ 'Tarikh', 'Nama', 'No. Ahli', 'Jenis', 'Perkara', 'Cara', 'Jumlah (RM)', 'Kaedah', 'No. Resit', 'Status', 'Sumber', 'Catatan' ], $out );
+	pk_csv_out( 'bayaran', [ 'Tarikh', 'Nama', 'No. Kariah', 'Jenis', 'Perkara', 'Cara', 'Jumlah (RM)', 'Kaedah', 'No. Resit', 'Status', 'Sumber', 'Catatan' ], $out );
 } );
 
 /* ================================================================= import */
@@ -72,7 +72,7 @@ function pk_page_import() {
 	?>
 	<div class="pk-grid2">
 	<div class="pk-box">
-		<h2><span class="dashicons dashicons-upload"></span> Import Ahli Khairat (CSV)</h2>
+		<h2><span class="dashicons dashicons-upload"></span> Import Ahli Kariah &amp; Khairat (CSV)</h2>
 		<p>Menerima dua format:</p>
 		<ol>
 			<li><b>Respons Google Form "Kutipan Khairat Kematian"</b> — muat turun dari Google Sheets (Fail → Muat turun → CSV). Lajur <i>Nama Penuh, No Kad Pengenalan, No. Telefon, Alamat Rumah, Maklumat Isi Rumah, Jumlah bayaran, Tunggakan…, Resit Pembayaran</i> dikenal pasti secara automatik.</li>
@@ -86,11 +86,11 @@ function pk_page_import() {
 			<p><label><input type="checkbox" name="dry" value="1" checked> Cubaan sahaja (tidak simpan — lihat ringkasan dahulu)</label></p>
 			<p><button class="button button-primary">Import</button></p>
 		</form>
-		<p class="description">Rekod dengan No. KP yang telah wujud akan dilangkau (tiada pendua).</p>
+		<p class="description">Rekod dengan No. KP yang telah wujud akan dilangkau (tiada pendua). Rekod yang diimport dicatat sebagai <b>Ahli Kariah</b> dan <b>ahli Khairat</b> (No. Kariah diberikan jika Aktif).</p>
 	</div>
 	<div class="pk-box">
 		<h2><span class="dashicons dashicons-download"></span> Eksport</h2>
-		<p><a class="button" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=pk_export_ahli' ), 'pk_export' ) ); ?>">Semua ahli khairat (CSV)</a></p>
+		<p><a class="button" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=pk_export_ahli' ), 'pk_export' ) ); ?>">Semua ahli kariah &amp; khairat (CSV)</a></p>
 		<p><a class="button" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=pk_export_korban&musim=' . rawurlencode( pk_opt( 'musim_korban' ) ) ), 'pk_export' ) ); ?>">Korban &amp; aqiqah <?php echo esc_html( pk_opt( 'musim_korban' ) ); ?> (CSV)</a></p>
 		<p><a class="button" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=pk_export_bayaran' ), 'pk_export' ) ); ?>">Semua transaksi bayaran (CSV)</a></p>
 		<p class="description">Fail CSV boleh dibuka terus dalam Excel / Google Sheets. Senarai yang ditapis boleh dieksport dari halaman senarai masing-masing.</p>
@@ -197,13 +197,16 @@ add_action( 'admin_post_pk_import', function () {
 		if ( $g( 'bil_isi' ) ) { $note[] = 'Bil. isi rumah dinyatakan: ' . $g( 'bil_isi' ); }
 		if ( $g( 'catatan' ) ) { $note[] = $g( 'catatan' ); }
 		$id = pk_save_ahli_data( [
-			'no_ahli' => $g( 'no_ahli' ), 'nama' => $nama, 'no_kp' => $kp, 'no_hp' => $g( 'no_hp' ), 'email' => sanitize_email( $g( 'email' ) ), 'alamat' => $g( 'alamat' ),
+			'nama' => $nama, 'no_kp' => $kp, 'no_hp' => $g( 'no_hp' ), 'email' => sanitize_email( $g( 'email' ) ), 'alamat' => $g( 'alamat' ),
 			'kawasan' => $g( 'kawasan' ), 'pekerjaan' => $g( 'pekerjaan' ), 'sektor' => $g( 'sektor' ), 'majikan' => $g( 'majikan' ),
-			'p_nama' => $g( 'p_nama' ), 'p_kp' => $g( 'p_kp' ), 'p_hp' => $g( 'p_hp' ), 'status' => $st, 'sumber' => 'import', 'tarikh_daftar' => $date, 'catatan' => implode( "\n", $note ),
+			'p_nama' => $g( 'p_nama' ), 'p_kp' => $g( 'p_kp' ), 'p_hp' => $g( 'p_hp' ), 'status' => $st, 'khairat' => $st, 'tarikh_khairat' => 'aktif' === $st ? $date : null, 'sumber' => 'import', 'tarikh_daftar' => $date, 'catatan' => implode( "\n", $note ),
 		] );
 		global $wpdb;
 		$wpdb->update( pk_t( 'ahli' ), [ 'created_at' => $date . ( $ts ? gmdate( ' H:i:s', $ts ) : ' 00:00:00' ) ], [ 'id' => $id ] );
 		pk_tanggungan_replace( $id, $tgs );
+		// imported = existing members: kariah fee treated as settled; No. Kariah issued by the system
+		pk_log( $id, 'kariah_kecuali', 'Rekod import (ahli sedia ada) — yuran Ahli Kariah tidak dikenakan' );
+		pk_save_ahli_data( [ 'khairat' => $st ], $id );
 		foreach ( $plans as $pl ) {
 			$pid = pk_pelan_create( array_merge( $pl, [ 'jenis' => 'khairat', 'ref_id' => $id, 'cara' => 'sekaligus', 'tarikh_mula' => $date ] ) );
 			pk_bayaran_create( [ 'pelan_id' => $pid, 'jumlah' => $pl['jumlah'], 'tarikh' => $date, 'kaedah' => 'qr', 'status' => $sah ? 'sah' : 'menunggu', 'sumber' => 'import', 'catatan' => $g( 'resit' ) ? 'Bukti dalam Google Form' : '' ] );
