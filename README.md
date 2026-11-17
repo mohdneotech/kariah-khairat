@@ -9,9 +9,10 @@ Plugin WordPress untuk mengurus **Ahli Kariah (No. Kariah), Badan Khairat Kemati
 ## Ciri-ciri
 
 **Untuk orang awam**
-- Borang **Daftar Ahli Kariah** (sekali sahaja, terima No. Kariah) dan **Daftar Khairat** untuk Ahli Kariah sahaja (ahli baharu / pembaharuan / tunggakan) dan **Daftar Korban & Aqiqah** (peserta, bahagian, agihan daging, akad wakalah)
+- Borang **Daftar Ahli Kariah** (sekali sahaja, terima No. Kariah) dengan muat naik **salinan IC** / surat pengesahan alamat, semakan umur minimum dari No. KP dan **Daftar Khairat** untuk Ahli Kariah sahaja (ahli baharu / pembaharuan / tunggakan) dan **Daftar Korban & Aqiqah** (peserta, bahagian, agihan daging, akad wakalah)
 - Bayaran **sekaligus atau ansuran** (2–36 bulan), muat naik bukti bayaran (JPG/PNG/PDF), kod QR & akaun bank masjid
 - **Semak Status & Bayar Ansuran** dengan No. KP + No. Telefon
+- **Kad Ahli Kariah** — dijana automatik (85.6 × 54 mm, 300 dpi) dengan gambar profil, No. Kariah, No. KP bertopeng dan kod pengesahan; muat turun atau cetak saiz sebenar dari Portal Ahli
 - **Portal Ahli** — log masuk dengan No. KP; lihat yuran, resit rasmi, tanggungan; kemas kini maklumat hubungan terus, perubahan pasangan/tanggungan melalui kelulusan AJK
 
 **Untuk AJK (wp-admin)**
@@ -34,6 +35,11 @@ Plugin WordPress untuk mengurus **Ahli Kariah (No. Kariah), Badan Khairat Kemati
 | Papan pemuka | Portal Ahli |
 |---|---|
 | ![](docs/papan-pemuka.png) | ![](docs/portal-ahli.png) |
+
+**Baharu dalam 1.7.0 — Dokumen sokongan, Kad Ahli Kariah & terma boleh disunting**
+- **Dokumen sokongan:** borang Ahli Kariah mewajibkan salinan Kad Pengenalan; surat pengesahan alamat (JPKK / penghulu / pengerusi taman) diwajibkan jika alamat IC berbeza. Disimpan secara peribadi; AJK boleh lihat / muat naik dari rekod ahli, ahli boleh kemas kini di Portal Ahli. Senarai ahli menandakan rekod *Tiada salinan IC*.
+- **Kad Ahli Kariah:** imej PNG dijana ketika diminta (tidak disimpan) untuk Ahli Kariah aktif — logo masjid, warna tema plugin, gambar profil, No. Kariah, No. KP bertopeng, tarikh ahli dan **kod pengesahan** (AJK semak kod pada rekod ahli). Butang *Kad Ahli* di Portal, halaman cetak saiz sebenar.
+- **Terma Ahli Kariah** boleh disunting di Tetapan (`{masjid}` `{yuran_kariah}` `{umur_min_kariah}`), **umur minimum** pendaftaran (lalai 18 — disemak dari No. KP) dan pautan pilihan ke **halaman syarat & faedah**.
 
 **Baharu dalam 1.6.0 — Ahli Kariah dahulu, kemudian Khairat**
 - Pendaftaran **Ahli Kariah** (sekali seumur hidup) kini langkah pertama. **No. Kariah** (`KK-0001`) diberikan **oleh sistem sahaja** — selepas AJK meluluskan pendaftaran **dan** yuran Ahli Kariah disahkan (atau yuran RM0 / dikecualikan). Tiada sesiapa boleh mengisi atau menukar No. Kariah secara manual.

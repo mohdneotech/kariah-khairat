@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.7.0 — 2026-11-18
+Ported from the Perepat Kariah 1.5.3–1.6.0 site builds.
+- **Supporting documents** (`includes/dokumen.php`): the Ahli Kariah form requires a copy of the IC (`dok_ic`); the address-confirmation letter (`dok_alamat`) becomes required when "IC address differs" is ticked. Files are private (same handling as payment proofs), viewable by the member and AJK, deleted with the record. AJK member-screen box (view / upload / remove, logged), "Tiada salinan IC" chip in the list, Portal Ahli upload card (notifies AJK).
+- **Kad Ahli Kariah** (`includes/kad.php`): 1012×638 PNG (ID-1 card at 300 dpi) generated with GD on request for active Ahli Kariah — logo (custom logo → theme logo → site icon), plugin colours, profile photo or initial, name (wraps), No. Kariah, masked No. KP, member since, site host and an HMAC verification code. `admin-post.php?action=pk_kad` (nonce; owner or `pk_urus`) with inline / download / real-size print modes. Portal header button + Profil card; AJK member-screen box with the code.
+- **Editable Ahli Kariah terms** (`terma_kariah`, placeholders `{masjid}` `{yuran_kariah}` `{umur_min_kariah}`; default = standard Selangor-style conditions), **minimum age** (`umur_min_kariah`, default 18, checked from the MyKad number), optional **terms page URL** (`url_syarat`) linked from the form.
+- DB version 6 (`dok_ic`, `dok_alamat`); upgrades automatically.
+
 ## 1.6.0 — 2026-11-17
 Ported from the Perepat Kariah 1.5.0–1.5.2 site builds. **Workflow change: Ahli Kariah first, then Khairat.**
 - A member record is now the **Ahli Kariah** record. New page/shortcode **`[pk_borang_kariah]`** (Persediaan → Cipta halaman adds it). Status = kariah status; `no_ahli` = **No. Kariah**.

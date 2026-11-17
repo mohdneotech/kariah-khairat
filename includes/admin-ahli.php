@@ -82,7 +82,7 @@ function pk_page_ahli() {
 				<tr>
 					<th class="check-column"><input type="checkbox" name="ids[]" value="<?php echo (int) $r['id']; ?>"></th>
 					<td><?php echo esc_html( $r['no_ahli'] ?: '—' ); ?></td>
-					<td><strong><a href="<?php echo esc_url( $url ); ?>"><?php echo esc_html( $r['nama'] ); ?></a></strong><div class="description"><?php echo esc_html( pk_mask_kp( $r['no_kp'] ) ); ?> · <?php echo esc_html( pk_label( 'sumber', $r['sumber'] ) ); ?></div>
+					<td><strong><a href="<?php echo esc_url( $url ); ?>"><?php echo esc_html( $r['nama'] ); ?></a></strong><div class="description"><?php echo esc_html( pk_mask_kp( $r['no_kp'] ) ); ?> · <?php echo esc_html( pk_label( 'sumber', $r['sumber'] ) ); ?><?php echo '' === (string) $r['dok_ic'] && in_array( $r['status'], [ 'menunggu', 'lulus' ], true ) ? ' · <span class="pk-chip pk-chip-alt">Tiada salinan IC</span>' : ''; ?></div>
 						<div class="row-actions"><a href="<?php echo esc_url( $url ); ?>">Lihat / Edit</a> | <a href="<?php echo esc_url( admin_url( 'admin.php?page=pk-ahli&action=print&id=' . $r['id'] ) ); ?>" target="_blank">Cetak</a></div></td>
 					<td><a href="tel:<?php echo esc_attr( pk_digits( $r['no_hp'] ) ); ?>"><?php echo esc_html( $r['no_hp'] ); ?></a></td>
 					<td><?php echo esc_html( $r['kawasan'] ?: '—' ); ?></td>
@@ -274,6 +274,8 @@ function pk_ahli_edit_screen( $id ) {
 				. '<p><a class="button button-primary" href="' . esc_url( admin_url( 'admin.php?page=pk-kemaskini' ) ) . '">Semak &amp; luluskan</a></p></div>';
 		}
 		pk_admin_pelan_panel( 'khairat', $id, [ 'tajuk' => "Yuran Tahunan $yr", 'jumlah' => pk_opt( 'yuran_tahunan' ), 'kategori' => 'tahunan', 'liputan' => (string) $yr ] );
+		pk_admin_kad_box( $a );
+		pk_admin_dok_box( $a );
 		pk_admin_foto_box( $a );
 		pk_admin_portal_box( $a );
 		pk_admin_log_box( $id );

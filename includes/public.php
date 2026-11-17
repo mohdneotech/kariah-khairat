@@ -100,16 +100,27 @@ function pk_handle_kariah() {
 	if ( strlen( pk_digits( $hp ) ) < 9 ) { $e->add( 'x', 'Sila isi No. Telefon bimbit yang sah.' ); }
 	if ( mb_strlen( $alamat ) < 8 ) { $e->add( 'x', 'Sila isi Alamat Rumah.' ); }
 	if ( empty( $_POST['perakuan'] ) ) { $e->add( 'x', 'Sila tandakan perakuan bersetuju dengan terma dan syarat.' ); }
+	if ( 12 === strlen( $kp ) ) {
+		$age = pk_age( pk_kp_info( $kp )[0] ); $min = (int) pk_opt( 'umur_min_kariah' );
+		if ( $min && null !== $age && $age < $min ) { $e->add( 'x', "Pendaftaran Ahli Kariah hanya untuk mereka yang berumur $min tahun dan ke atas. Anak tanggungan dilindungi di bawah keahlian khairat ketua keluarga." ); }
+	}
 	$exist = pk_find_ahli_by_kp( $kp );
 	if ( $exist && 'ditolak' !== $exist['status'] ) {
 		$e->add( 'x', 'No. Kad Pengenalan ini telah didaftarkan sebagai Ahli Kariah. Semak status anda di halaman Semak Status (No. KP + No. Telefon), atau hubungi AJK.' );
 	}
+	if ( empty( $_FILES['dok_ic']['tmp_name'] ) ) { $e->add( 'x', 'Sila muat naik salinan Kad Pengenalan (Bahagian D).' ); }
+	if ( ! empty( $_POST['alamat_beza'] ) && empty( $_FILES['dok_alamat']['tmp_name'] ) ) { $e->add( 'x', 'Alamat pada Kad Pengenalan berbeza — sila muat naik surat pengesahan alamat daripada JPKK / penghulu / pengerusi taman.' ); }
 	$fee = (float) pk_opt( 'yuran_kariah' );
 	$pay = $fee > 0 ? pk_payment_from_post( $fee ) : null;
 	if ( $pay && $pay['bayar'] > 0 && 'tunai' !== $pay['kaedah'] && empty( $_FILES['bukti']['tmp_name'] ) ) {
 		$e->add( 'x', 'Sila muat naik bukti pembayaran, atau set "Jumlah dibayar sekarang" kepada 0 jika belum membuat bayaran.' );
 	}
 	if ( $e->has_errors() ) { return $e; }
+	$dok = [];
+	foreach ( [ 'dok_ic', 'dok_alamat' ] as $f ) {
+		$dok[ $f ] = pk_store_upload( $f );
+		if ( is_wp_error( $dok[ $f ] ) ) { foreach ( $dok as $d ) { if ( is_string( $d ) ) { pk_private_delete( $d ); } } return new WP_Error( 'x', pk_dok_label( $f ) . ': ' . $dok[ $f ]->get_error_message() ); }
+	}
 	$bukti = $pay ? pk_store_upload( 'bukti' ) : '';
 	if ( is_wp_error( $bukti ) ) { return $bukti; }
 
@@ -120,7 +131,9 @@ function pk_handle_kariah() {
 		'status' => 'menunggu', 'sumber' => 'online', 'khairat' => '', 'catatan' => '',
 	] );
 	pk_tanggungan_replace( $id, pk_tanggungan_from_post() );
-	pk_log( $id, 'daftar', 'Pendaftaran Ahli Kariah dalam talian' );
+	global $wpdb;
+	$wpdb->update( pk_t( 'ahli' ), [ 'dok_ic' => (string) $dok['dok_ic'], 'dok_alamat' => (string) $dok['dok_alamat'] ], [ 'id' => $id ] );
+	pk_log( $id, 'daftar', 'Pendaftaran Ahli Kariah dalam talian' . ( ! empty( $_POST['alamat_beza'] ) ? ' (alamat IC berbeza — surat pengesahan dilampirkan)' : '' ) );
 	// logged-in user (e.g. AJK/admin registering themselves) without a linked record: link it to their account
 	if ( is_user_logged_in() && ! pk_ahli_for_user() ) {
 		global $wpdb;
@@ -441,7 +454,7 @@ add_shortcode( 'pk_borang_kariah', function () {
 		<div class="pk-intro">
 			<div><i class="fa-solid fa-mosque"></i></div>
 			<div><strong>Pendaftaran Ahli Kariah <?php echo esc_html( pk_nama() ); ?></strong><br>
-			Daftar <strong>sekali sahaja</strong>. Selepas pendaftaran diluluskan AJK<?php echo (float) pk_opt( 'yuran_kariah' ) > 0 ? ' dan yuran disahkan' : ''; ?>, anda akan menerima <strong>No. Kariah</strong> — No. Kariah ini diperlukan untuk mendaftar <a href="<?php echo esc_url( pk_page_url( 'khairat' ) ); ?>">Khairat Kematian</a> dan untuk mengaktifkan akaun Portal Ahli.<?php echo $fee > 0 ? ' Yuran pendaftaran ahli kariah: <strong>' . esc_html( pk_rm( $fee ) ) . '</strong>.' : ''; ?></div>
+			Daftar <strong>sekali sahaja</strong>. Selepas pendaftaran diluluskan AJK<?php echo (float) pk_opt( 'yuran_kariah' ) > 0 ? ' dan yuran disahkan' : ''; ?>, anda akan menerima <strong>No. Kariah</strong> — No. Kariah ini diperlukan untuk mendaftar <a href="<?php echo esc_url( pk_page_url( 'khairat' ) ); ?>">Khairat Kematian</a> dan untuk mengaktifkan akaun Portal Ahli.<?php echo $fee > 0 ? ' Yuran pendaftaran ahli kariah: <strong>' . esc_html( pk_rm( $fee ) ) . '</strong> (sekali seumur hidup).' : ''; ?><?php if ( pk_syarat_url() ) : ?><br><a class="pk-intro-link" href="<?php echo esc_url( pk_syarat_url() ); ?>"><i class="fa-solid fa-circle-info"></i> Baca syarat kelayakan &amp; faedah Ahli Kariah</a><?php endif; ?></div>
 		</div>
 		<?php echo pk_kariah_steps( 1 ); ?>
 
@@ -486,12 +499,22 @@ add_shortcode( 'pk_borang_kariah', function () {
 			<button type="button" class="btn btn-sm btn-outline-success mt-2" data-pk-add="tg"><i class="fa-solid fa-plus"></i> Tambah tanggungan</button>
 		</div>
 
+		<div class="pk-card">
+			<h3 class="pk-h"><span class="pk-step">D</span> Dokumen Sokongan</h3>
+			<p class="small text-secondary">JPG, PNG atau PDF, maksimum 10 MB setiap fail. Disimpan secara peribadi — hanya anda dan AJK boleh melihatnya.</p>
+			<div class="row g-3">
+				<div class="col-md-6"><label class="form-label">Salinan Kad Pengenalan <span class="text-danger">*</span></label><input type="file" class="form-control" name="dok_ic" accept="image/*,application/pdf" required><div class="form-text">Bahagian depan IC yang menunjukkan alamat dalam kariah.</div></div>
+				<div class="col-md-6"><label class="form-label">Surat pengesahan alamat</label><input type="file" class="form-control" name="dok_alamat" accept="image/*,application/pdf"><div class="form-text">Daripada JPKK, penghulu atau pengerusi taman.</div></div>
+				<div class="col-12"><label class="form-check"><input class="form-check-input" type="checkbox" name="alamat_beza" value="1" <?php checked( ! empty( $_POST['alamat_beza'] ) ); ?>> <span class="form-check-label">Alamat pada Kad Pengenalan saya <strong>berbeza</strong> dengan alamat tempat tinggal semasa (surat pengesahan alamat diperlukan).</span></label></div>
+			</div>
+		</div>
+
 		<?php if ( $fee > 0 ) { echo pk_payment_block( 'Yuran Ahli Kariah (sekali)' ); } ?>
 
 		<div class="pk-card">
-			<h3 class="pk-h"><span class="pk-step">D</span> Perakuan</h3>
+			<h3 class="pk-h"><span class="pk-step">E</span> Perakuan</h3>
 			<details class="pk-terms"><summary>Baca Terma &amp; Syarat</summary><?php echo pk_terma_kariah(); ?></details>
-			<label class="form-check mt-3"><input class="form-check-input" type="checkbox" name="perakuan" value="1" required <?php checked( ! empty( $_POST['perakuan'] ) ); ?>> <span class="form-check-label">Saya mengesahkan bahawa saya bermastautin dalam kawasan kariah <?php echo esc_html( pk_nama() ); ?>, maklumat yang diberi adalah benar, dan saya <strong>bersetuju</strong> dengan terma dan syarat.</span></label>
+			<label class="form-check mt-3"><input class="form-check-input" type="checkbox" name="perakuan" value="1" required <?php checked( ! empty( $_POST['perakuan'] ) ); ?>> <span class="form-check-label">Saya mengesahkan bahawa saya memenuhi syarat kelayakan<?php echo (int) pk_opt( 'umur_min_kariah' ) ? ' (berumur ' . (int) pk_opt( 'umur_min_kariah' ) . ' tahun ke atas)' : ''; ?>, bermastautin dalam kawasan kariah <?php echo esc_html( pk_nama() ); ?>, maklumat yang diberi adalah benar, dan saya <strong>bersetuju</strong> dengan terma dan syarat.</span></label>
 		</div>
 
 		<button type="submit" class="btn btn-mp btn-lg"><i class="fa-solid fa-paper-plane"></i> Hantar Pendaftaran Ahli Kariah</button>
@@ -510,13 +533,18 @@ function pk_kariah_steps( $cur ) {
 	return $h . '</ol>';
 }
 
+/** Admin-editable kariah terms (Tetapan → Terma Ahli Kariah), one per line, placeholders via pk_fill(). */
 function pk_terma_kariah() {
-	return '<ol class="small mb-0">'
-		. '<li>Ahli kariah ialah orang Islam yang bermastautin dalam kawasan kariah ' . esc_html( pk_nama() ) . ' seperti yang ditetapkan oleh peraturan masjid dan pihak berkuasa agama negeri.</li>'
-		. '<li>Pendaftaran Ahli Kariah dibuat sekali sahaja. No. Kariah akan diberikan selepas permohonan disemak dan diluluskan oleh AJK.</li>'
-		. '<li>Hanya Ahli Kariah yang aktif (mempunyai No. Kariah) layak mendaftar sebagai ahli Badan Khairat Kematian.</li>'
-		. '<li>Ahli bertanggungjawab mengemas kini maklumat diri, pasangan dan tanggungan melalui Portal Ahli atau pejabat masjid.</li>'
-		. '<li>Maklumat peribadi digunakan untuk urusan pentadbiran masjid sahaja dan tidak akan didedahkan kepada pihak luar.</li></ol>';
+	$lines = array_filter( array_map( 'trim', explode( "\n", (string) pk_opt( 'terma_kariah' ) ) ) );
+	$h = $lines ? '<ol class="small mb-0"><li>' . implode( '</li><li>', array_map( 'esc_html', array_map( 'pk_fill', $lines ) ) ) . '</li></ol>' : '<p class="small mb-0">Tertakluk kepada peraturan ' . esc_html( pk_nama() ) . '.</p>';
+	return $h . ( pk_syarat_url() ? '<p class="small mt-2 mb-0"><a href="' . esc_url( pk_syarat_url() ) . '" target="_blank" rel="noopener">Syarat, tatacara &amp; faedah penuh Ahli Kariah &rarr;</a></p>' : '' );
+}
+
+/** Page with the full kariah conditions & benefits: Tetapan URL, or pk_pages['syarat'], or ''. */
+function pk_syarat_url() {
+	if ( $u = pk_opt( 'url_syarat' ) ) { return (string) $u; }
+	$ids = (array) get_option( 'pk_pages', [] );
+	return ! empty( $ids['syarat'] ) && 'publish' === get_post_status( $ids['syarat'] ) ? get_permalink( $ids['syarat'] ) : '';
 }
 
 /* ================================================================= [pk_borang_khairat] — langkah 2: Khairat (Ahli Kariah sahaja) */

@@ -13,7 +13,19 @@ function pk_default_settings() {
 		'yuran_kariah'     => 0,
 		'yuran_daftar'     => 30,
 		'yuran_tahunan'    => 36,
-		'had_umur_anak'    => 18,   // anak pada/melebihi umur ini perlu daftar sendiri (0 = tiada had)
+		'had_umur_anak'    => 18,
+		'umur_min_kariah'  => 18,   // umur minimum pendaftaran Ahli Kariah (0 = tiada had)
+		'url_syarat'       => '',   // halaman syarat & faedah Ahli Kariah (pilihan)
+		'terma_kariah'     => implode( "\n", [
+			'Warganegara Malaysia, berumur {umur_min_kariah} tahun dan ke atas (lelaki dan perempuan).',
+			'Akidah: berpegang dan beramal dengan pegangan Ahli Sunnah Wal Jamaah.',
+			'Mastautin: tinggal tetap, bermukim atau bermastautin di dalam kawasan kariah {masjid} sekurang-kurangnya empat (4) bulan.',
+			'Sertakan salinan Kad Pengenalan yang menunjukkan alamat dalam kariah. Jika alamat pada Kad Pengenalan berbeza dengan tempat tinggal semasa, sertakan surat pengesahan alamat daripada ketua komuniti (JPKK, penghulu atau pengerusi taman).',
+			'Setiap jemaah hanya boleh mendaftar satu keahlian kariah (tidak boleh bertindih).',
+			'No. Kariah diberikan oleh sistem selepas pendaftaran disahkan oleh AJK dan yuran ({yuran_kariah}) dijelaskan.',
+			'Kelayakan sebagai ahli kariah terlucut apabila berpindah keluar dari kawasan kariah atau meninggal dunia.',
+			'Hanya Ahli Kariah berdaftar layak mendaftar sebagai ahli Badan Khairat Kematian. Maklumat peribadi digunakan untuk urusan pentadbiran masjid sahaja.',
+		] ),   // anak pada/melebihi umur ini perlu daftar sendiri (0 = tiada had)
 		'harga_bahagian'   => 950,
 		'musim_korban'     => pk_hijri_year( $y ) . 'H',
 		'tahun_korban_m'   => (string) $y,
@@ -67,6 +79,7 @@ function pk_fill( $text ) {
 		'{yuran_tahunan}'  => pk_rm( pk_opt( 'yuran_tahunan' ) ),
 		'{yuran_kariah}'   => pk_rm( pk_opt( 'yuran_kariah' ) ),
 		'{had_umur_anak}'  => (string) (int) pk_opt( 'had_umur_anak' ),
+		'{umur_min_kariah}' => (string) (int) pk_opt( 'umur_min_kariah' ),
 		'{harga_bahagian}' => pk_rm( pk_opt( 'harga_bahagian' ) ),
 	] );
 }

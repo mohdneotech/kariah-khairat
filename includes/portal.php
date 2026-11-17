@@ -43,7 +43,7 @@ add_action( 'template_redirect', function () {
 	$act = is_string( $_POST['pk_portal'] ) ? sanitize_key( $_POST['pk_portal'] ) : '';
 	$err = &$GLOBALS['pk_errors'];
 	if ( ! wp_verify_nonce( $_POST['pk_nonce'] ?? '', 'pk_portal_' . $act ) ) { $err[] = 'Sesi tamat. Sila muat semula halaman dan cuba lagi.'; return; }
-	$map = [ 'login' => 'pk_portal_login', 'aktif' => 'pk_portal_aktif', 'pautkan' => 'pk_portal_pautkan', 'profil' => 'pk_portal_profil', 'keluarga' => 'pk_portal_keluarga', 'bayar' => 'pk_portal_bayar', 'katalaluan' => 'pk_portal_katalaluan', 'batal' => 'pk_portal_batal', 'foto' => 'pk_portal_foto', 'foto_padam' => 'pk_portal_foto_padam' ];
+	$map = [ 'login' => 'pk_portal_login', 'aktif' => 'pk_portal_aktif', 'pautkan' => 'pk_portal_pautkan', 'profil' => 'pk_portal_profil', 'keluarga' => 'pk_portal_keluarga', 'bayar' => 'pk_portal_bayar', 'katalaluan' => 'pk_portal_katalaluan', 'batal' => 'pk_portal_batal', 'foto' => 'pk_portal_foto', 'foto_padam' => 'pk_portal_foto_padam', 'dok' => 'pk_portal_dok' ];
 	if ( ! isset( $map[ $act ] ) ) { return; }
 	if ( 'pautkan' === $act && ! is_user_logged_in() ) { $err[] = 'Sila log masuk semula.'; return; }
 	if ( ! in_array( $act, [ 'login', 'aktif', 'pautkan' ], true ) && ! pk_ahli_for_user() ) { $err[] = 'Sila log masuk semula.'; return; }
@@ -332,6 +332,7 @@ function pk_portal_member( array $a ) {
 				<div class="pk-mh-name"><?php echo esc_html( $a['nama'] ); ?></div>
 				<div class="pk-mh-meta">No. Kariah <strong><?php echo esc_html( $a['no_ahli'] ?: 'belum diberikan' ); ?></strong> · <?php echo pk_badge( 'status_ahli', $a['status'] ); ?> · Khairat: <?php echo pk_badge( 'status_khairat', $a['khairat'] ); ?><?php if ( in_array( $a['khairat'], [ 'aktif', 'menunggu' ], true ) ) : ?> · Yuran <?php echo (int) $yr; ?>: <?php echo $paid ? '<span class="pk-badge pk-b-ok">Dijelaskan</span>' : '<span class="pk-badge pk-b-warn">Belum dijelaskan</span>'; ?><?php endif; ?></div>
 			</div>
+			<?php if ( pk_is_kariah_aktif( $a ) ) : ?><a class="btn btn-sm btn-light" href="<?php echo esc_url( pk_kad_url( $a, 'cetak' ) ); ?>" target="_blank"><i class="fa-solid fa-id-card"></i> Kad Ahli</a><?php endif; ?>
 			<?php if ( current_user_can( PK_CAP ) ) : ?><a class="btn btn-sm btn-light" href="<?php echo esc_url( admin_url( 'admin.php?page=pk-dashboard' ) ); ?>"><i class="fa-solid fa-gauge"></i> Papan Pemuka AJK</a><?php endif; ?>
 			<a class="btn btn-sm btn-outline-light" href="<?php echo esc_url( wp_logout_url( pk_page_url( 'portal' ) ) ); ?>"><i class="fa-solid fa-right-from-bracket"></i> Log keluar</a>
 		</div>
@@ -347,6 +348,7 @@ function pk_portal_member( array $a ) {
 		<div class="tab-content pk-tab-body">
 			<!-- PROFIL -->
 			<div class="tab-pane fade show active" id="profil">
+				<?php echo pk_portal_kad_card( $a ); ?>
 				<div class="pk-card pk-foto-card">
 					<?php echo pk_avatar_html( $a, 'pk-avatar pk-avatar-lg' ); ?>
 					<div class="flex-grow-1">
@@ -360,6 +362,7 @@ function pk_portal_member( array $a ) {
 						<?php if ( $a['gambar'] ) : ?><form method="post" class="mt-2" onsubmit="return confirm('Buang gambar profil anda?')"><?php echo pk_pf( 'foto_padam' ); ?><button class="btn btn-link btn-sm text-danger p-0">Buang gambar</button></form><?php endif; ?>
 					</div>
 				</div>
+				<?php echo pk_portal_dok_card( $a ); ?>
 				<form method="post" class="pk-card pk-form">
 					<?php echo pk_pf( 'profil' ); ?>
 					<div class="pk-kv mb-3"><div><span>Nama</span><?php echo esc_html( $a['nama'] ); ?></div><div><span>No. KP</span><?php echo esc_html( pk_fmt_kp( $a['no_kp'] ) ); ?></div><div><span>Tarikh daftar</span><?php echo esc_html( pk_date( $a['tarikh_daftar'] ) ); ?></div></div>

@@ -317,7 +317,7 @@ function pk_page_tetapan() {
 
 		<h2>Yuran &amp; bayaran</h2>
 		<table class="form-table" role="presentation"><?php
-			$row( 'Ahli Kariah', '<span class="pk-inline"><label>Yuran pendaftaran ahli kariah (RM)<br>' . $in( 'yuran_kariah', 'step="0.01" min="0"', 'number' ) . '</label><label>Had umur anak tanggungan khairat<br>' . $in( 'had_umur_anak', 'min="0" max="30" class="small-text"', 'number' ) . '</label></span>', '0 = percuma (AJK luluskan secara manual). Jika lebih 0, borang Ahli Kariah memaparkan bayaran dan pengesahan bayaran meluluskan ahli. Had umur: anak pada/melebihi umur ini perlu daftar khairat sendiri (0 = tiada had).' );
+			$row( 'Ahli Kariah', '<span class="pk-inline"><label>Yuran pendaftaran ahli kariah (RM)<br>' . $in( 'yuran_kariah', 'step="0.01" min="0"', 'number' ) . '</label><label>Umur minimum ahli<br>' . $in( 'umur_min_kariah', 'min="0" max="30" class="small-text"', 'number' ) . '</label><label>Had umur anak tanggungan khairat<br>' . $in( 'had_umur_anak', 'min="0" max="30" class="small-text"', 'number' ) . '</label></span>', '0 = percuma (AJK luluskan secara manual). Jika lebih 0, borang Ahli Kariah memaparkan bayaran dan pengesahan bayaran meluluskan ahli. Had umur: anak pada/melebihi umur ini perlu daftar khairat sendiri (0 = tiada had).' );
 			$row( 'Yuran Khairat', '<span class="pk-inline"><label>Pendaftaran (RM)<br>' . $in( 'yuran_daftar', 'step="0.01" min="0"', 'number' ) . '</label><label>Tahunan (RM)<br>' . $in( 'yuran_tahunan', 'step="0.01" min="0"', 'number' ) . '</label><label>Prefix No. Kariah<br>' . $in( 'prefix_ahli', 'size="6" maxlength="10"' ) . '</label></span>', 'No. Kariah dijana sebagai <code>PREFIX-0001</code> apabila ahli diaktifkan.' );
 			$row( 'Korban / Aqiqah', '<span class="pk-inline"><label>Musim (Hijrah)<br>' . $in( 'musim_korban', 'size="8"' ) . '</label><label>Tahun Masihi<br>' . $in( 'tahun_korban_m', 'size="6"' ) . '</label><label>Harga sebahagian (RM)<br>' . $in( 'harga_bahagian', 'step="0.01" min="0"', 'number' ) . '</label></span>', 'Tukar musim setiap tahun selepas Aidiladha — rekod lama kekal di bawah musim masing-masing.' );
 			$row( 'Ansuran', '<label>Maksimum bilangan bulan pada borang awam ' . $in( 'max_ansuran', 'min="2" max="36" class="small-text"', 'number' ) . '</label>' );
@@ -331,6 +331,8 @@ function pk_page_tetapan() {
 			$row( 'Borang dalam talian', '<label><input type="checkbox" name="s[buka_kariah]" value="1" ' . checked( $s['buka_kariah'], 1, false ) . '> Buka pendaftaran Ahli Kariah</label><br><label><input type="checkbox" name="s[buka_khairat]" value="1" ' . checked( $s['buka_khairat'], 1, false ) . '> Buka pendaftaran Khairat (Ahli Kariah sahaja)</label><br><label><input type="checkbox" name="s[buka_korban]" value="1" ' . checked( $s['buka_korban'], 1, false ) . '> Buka pendaftaran Korban/Aqiqah</label>' );
 			$row( 'Senarai kawasan / taman', $ta( 'kawasan', 4 ), 'Satu setiap baris — dicadangkan pada borang dan digunakan dalam infografik.' );
 			$row( 'Terma & syarat khairat', $ta( 'terma_khairat', 7 ), 'Satu syarat setiap baris. Boleh guna <code>{masjid}</code> <code>{yuran_daftar}</code> <code>{yuran_tahunan}</code> <code>{had_umur_anak}</code>.' );
+			$row( 'Terma Ahli Kariah', $ta( 'terma_kariah', 8 ), 'Satu syarat setiap baris. Boleh guna <code>{masjid}</code> <code>{yuran_kariah}</code> <code>{umur_min_kariah}</code>.' );
+			$row( 'Halaman syarat Ahli Kariah', $in( 'url_syarat', 'class="large-text" placeholder="https://…/syarat-ahli-kariah/"', 'url' ), 'Pilihan — pautan "Baca syarat kelayakan & faedah" pada borang Ahli Kariah.' );
 			$row( 'Akad wakalah korban', $ta( 'teks_wakalah', 3 ), 'Boleh guna <code>{masjid}</code>.' );
 			$row( 'Nota khairat', $ta( 'nota_khairat', 2 ), 'Dipaparkan selepas pendaftaran berjaya.' );
 			$row( 'Nota korban', $ta( 'nota_korban', 2 ) );
@@ -385,12 +387,16 @@ add_action( 'admin_post_pk_tetapan', function () {
 				$out[ $k ] = empty( $in[ $k ] ) ? 0 : 1; break;
 			case 'fail_borang' === $k:
 				$out[ $k ] = array_values( array_filter( array_map( 'intval', explode( ',', (string) ( $in[ $k ] ?? '' ) ) ) ) ); break;
-			case in_array( $k, [ 'kawasan', 'hubungi', 'nota_khairat', 'nota_korban', 'terma_khairat', 'teks_wakalah', 'alamat_masjid', 'takziah_doa' ], true ):
+			case in_array( $k, [ 'kawasan', 'hubungi', 'nota_khairat', 'nota_korban', 'terma_khairat', 'terma_kariah', 'teks_wakalah', 'alamat_masjid', 'takziah_doa' ], true ):
 				$out[ $k ] = mb_substr( sanitize_textarea_field( (string) ( $in[ $k ] ?? '' ) ), 0, 5000 ); break;
 			case in_array( $k, [ 'yuran_kariah', 'yuran_daftar', 'yuran_tahunan', 'harga_bahagian' ], true ):
 				$out[ $k ] = pk_money( $in[ $k ] ?? $v ); break;
 			case 'takziah_hari' === $k:
 				$out[ $k ] = max( 1, min( 60, (int) ( $in[ $k ] ?? 7 ) ) ); break;
+			case 'umur_min_kariah' === $k:
+				$out[ $k ] = max( 0, min( 30, (int) ( $in[ $k ] ?? 18 ) ) ); break;
+			case 'url_syarat' === $k:
+				$out[ $k ] = esc_url_raw( (string) ( $in[ $k ] ?? '' ), [ 'http', 'https' ] ); break;
 			case 'had_umur_anak' === $k:
 				$out[ $k ] = max( 0, min( 30, (int) ( $in[ $k ] ?? 18 ) ) ); break;
 			case 'max_ansuran' === $k:

@@ -2,8 +2,8 @@
 /**
  * Plugin Name:       Kariah & Khairat Masjid
  * Plugin URI:        https://github.com/mohdneotech/kariah-khairat
- * Description:       Sistem ahli kariah untuk masjid / surau — pendaftaran Ahli Kariah (No. Kariah) diikuti Badan Khairat Kematian (Ahli Kariah sahaja) dan Ibadah Korban/Aqiqah dalam talian atau manual oleh AJK, bayaran sekaligus & ansuran dengan bukti bayaran, Portal Ahli, semak status, import/eksport CSV papan pemuka infografik, gambar profil ahli dan makluman takziah (poster) di laman utama.
- * Version:           1.6.0
+ * Description:       Sistem ahli kariah untuk masjid / surau — pendaftaran Ahli Kariah (No. Kariah) diikuti Badan Khairat Kematian (Ahli Kariah sahaja) dan Ibadah Korban/Aqiqah dalam talian atau manual oleh AJK, bayaran sekaligus & ansuran dengan bukti bayaran, Portal Ahli, dokumen sokongan (salinan IC), Kad Ahli Kariah, semak status, import/eksport CSV papan pemuka infografik, gambar profil ahli dan makluman takziah (poster) di laman utama.
+ * Version:           1.7.0
  * Requires at least: 6.4
  * Requires PHP:      8.0
  * Author:            Mohd Nordin Hussain
@@ -26,8 +26,8 @@ if ( defined( 'PK_VER' ) ) {
 	return;
 }
 
-define( 'PK_VER', '1.6.0' );
-define( 'PK_DB_VER', '5' );
+define( 'PK_VER', '1.7.0' );
+define( 'PK_DB_VER', '6' );
 define( 'PK_FILE', __FILE__ );
 define( 'PK_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PK_URL', plugin_dir_url( __FILE__ ) );
@@ -40,6 +40,10 @@ require_once PK_DIR . 'includes/public.php';
 require_once PK_DIR . 'includes/portal.php';
 require_once PK_DIR . 'includes/class-github-updater.php';
 require_once PK_DIR . 'includes/foto.php';
+require_once PK_DIR . 'includes/dokumen.php';
+require_once PK_DIR . 'includes/kad.php';
+require_once PK_DIR . 'includes/dokumen.php';
+require_once PK_DIR . 'includes/kad.php';
 require_once PK_DIR . 'includes/takziah-render.php';
 require_once PK_DIR . 'includes/takziah.php';
 require_once PK_DIR . 'includes/dash-widget.php';

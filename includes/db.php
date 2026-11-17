@@ -52,6 +52,8 @@ function pk_install_schema() {
   gambar varchar(255) NOT NULL DEFAULT '',
   khairat varchar(20) NOT NULL DEFAULT '',
   tarikh_khairat date NULL,
+  dok_ic varchar(255) NOT NULL DEFAULT '',
+  dok_alamat varchar(255) NOT NULL DEFAULT '',
   PRIMARY KEY  (id),
   KEY no_kp (no_kp),
   KEY khairat (khairat),
@@ -322,7 +324,7 @@ function pk_find_ahli_by_kp( $kp ) {
 
 function pk_delete_ahli( $id ) {
 	global $wpdb;
-	if ( ( $a = pk_get_ahli( $id ) ) && $a['gambar'] ) { pk_private_delete( $a['gambar'] ); }
+	if ( $a = pk_get_ahli( $id ) ) { foreach ( [ 'gambar', 'dok_ic', 'dok_alamat' ] as $f ) { if ( $a[ $f ] ) { pk_private_delete( $a[ $f ] ); } } }
 	$wpdb->update( pk_t( 'takziah' ), [ 'ahli_id' => 0 ], [ 'ahli_id' => $id ] );
 	foreach ( pk_pelan_list( 'khairat', $id ) as $p ) { pk_delete_pelan( $p['id'] ); }
 	$wpdb->delete( pk_t( 'tanggungan' ), [ 'ahli_id' => $id ] );
@@ -527,6 +529,7 @@ function pk_kemaskini_pending( $ahli_id ) {
 /** Is this private file attached to a payment belonging to the given member (khairat record or korban with same KP)? */
 function pk_file_belongs_to_ahli( $rel, array $a ) {
 	global $wpdb;
+	if ( '' !== (string) $rel && in_array( $rel, [ $a['dok_ic'] ?? '', $a['dok_alamat'] ?? '' ], true ) ) { return true; }
 	$b = pk_t( 'bayaran' ); $p = pk_t( 'pelan' ); $k = pk_t( 'korban' );
 	return (bool) $wpdb->get_var( $wpdb->prepare(
 		"SELECT 1 FROM $b bb JOIN $p pp ON pp.id=bb.pelan_id LEFT JOIN $k kk ON pp.jenis='korban' AND kk.id=pp.ref_id
